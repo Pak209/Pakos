@@ -52,6 +52,12 @@ npm dependencies. Everything runs locally; nothing leaves the machine.
 - **`lib/memory.js`** — engineering memory slice 1: `.pakos/rejected.md`
   per project (append-only, human-editable); rejected suggestions stay
   suppressed, digit-insensitively.
+- **`lib/health.js`** — Portfolio Health v2: five explainable dimensions
+  (momentum, hygiene, recovery risk, debt, direction) computed
+  deterministically from scan data + board mtime; weighted composite and
+  grade, weights tunable in config. Every score ships with its reasons.
+  Quality (CI) deferred to the GitHub sensors. `scan_history` (90-day,
+  pruned) is the trend substrate.
 - **`lib/usage.js`** — subscription usage from local session/transcript
   files; provider usage APIs only when the user adds admin keys.
 - **`lib/scanner.js`** — walks `$PAKOS_ROOT` one level deep. For each git

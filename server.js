@@ -8,13 +8,14 @@ const path = require('node:path');
 const os = require('node:os');
 
 const { scan, PROJECTS_ROOT } = require('./lib/scanner');
-const { replaceScan, getState, getProject, DB_PATH } = require('./lib/db');
+const { replaceScan, getState, getProject, getHistory, DB_PATH } = require('./lib/db');
 const { getConfig, verifyBearer, CONFIG_PATH } = require('./lib/config');
 const { createMission, moveMission, BoardError } = require('./lib/board');
 const { verifyAccessJwt } = require('./lib/access');
 const { getUsage } = require('./lib/usage');
 const crew = require('./lib/crew');
 const recommend = require('./lib/recommend');
+const { computeAll, computeHealth } = require('./lib/health');
 const { appendRejected } = require('./lib/memory');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
@@ -172,7 +173,9 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/api/state' && req.method === 'GET') {
     const state = getState();
-    const { access } = getConfig();
+    const { access, health } = getConfig();
+    const grades = computeAll(state, PROJECTS_ROOT, health.weights);
+    state.projects = state.projects.map((p) => ({ ...p, health: grades[p.name] || null }));
     const accessOn = !!(access?.teamDomain && access?.audTag && access?.allowedEmails?.length);
     return json(res, 200, {
       version: VERSION,
@@ -208,6 +211,9 @@ const server = http.createServer((req, res) => {
     catch { return json(res, 400, { error: 'bad project name' }); }
     const detail = getProject(name);
     if (!detail) return json(res, 404, { error: 'unknown project' });
+    detail.health = computeHealth(detail.project, detail.tasks, PROJECTS_ROOT,
+      getConfig().health.weights);
+    detail.history = getHistory(name);
     return json(res, 200, detail);
   }
 
