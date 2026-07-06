@@ -346,6 +346,7 @@
   <button class="ditem" onclick="closeDrawer(); openBrief()"><span class="dic">☼</span>Daily Brief</button>
   <button class="ditem" onclick="closeDrawer(); doRescan()"><span class="dic">⟳</span>Rescan</button>
   <a href="https://github.com/Pak209/Pakos" target="_blank" rel="noopener"><span class="dic">⎇</span>GitHub Repo</a>
+  <a href="#" id="logoutItem" hidden><span class="dic">⏻</span>Sign out</a>
   <div class="dfoot" id="verline">PakOS</div>
 </aside>
 
@@ -472,27 +473,29 @@ async function doMove(taskId, toStatus) {
 }
 
 /* ---------- auth for writes ----------
-   Writes need the bearer token from ~/.pakos/config.json (server-generated).
-   Asked for once, kept in localStorage; re-asked automatically on 401. */
-function authToken(forceAsk) {
-  let t = localStorage.getItem('pakos_token') || '';
-  if (!t || forceAsk) {
-    t = (prompt('PakOS auth token (cat ~/.pakos/config.json on the server):') || '').trim();
-    if (t) localStorage.setItem('pakos_token', t);
-  }
-  return t;
-}
-
+   Normal path: no token at all — the Cloudflare Access session (your Google
+   sign-in, verified server-side) authorizes the write. Fallbacks: the stored
+   bearer token, then a one-time prompt (loopback/Tailscale/bootstrap). */
 async function apiPost(path, body) {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const token = authToken(attempt > 0);
-    if (!token) throw new Error('no token');
+  for (const mode of ['session', 'stored', 'prompt']) {
+    let token = null;
+    if (mode === 'stored') {
+      token = localStorage.getItem('pakos_token');
+      if (!token) continue;
+    }
+    if (mode === 'prompt') {
+      token = (prompt('PakOS auth token (cat ~/.pakos/config.json on the server):') || '').trim();
+      if (!token) break;
+      localStorage.setItem('pakos_token', token);
+    }
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
     const res = await fetch(path, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (res.status === 401) continue; // wrong token — ask again once
+    if (res.status === 401) continue; // try the next credential
     return res;
   }
   throw new Error('unauthorized');
@@ -549,6 +552,16 @@ function render(state) {
   pill.classList.toggle('warn', !!anyError);
   $('#systext').innerHTML = anyError ? 'CHECK<br>SYSTEM LOG' : 'ALL SYSTEMS<br>OPERATIONAL';
   $('#verline').textContent = `PakOS v${state.version} · ${state.projectsRoot}`;
+
+  // Sign out (Cloudflare Access session) — shown only when the server has
+  // Access verification configured.
+  const logout = $('#logoutItem');
+  if (system.access?.enabled && system.access.teamDomain) {
+    logout.hidden = false;
+    logout.href = `https://${system.access.teamDomain}/cdn-cgi/access/logout`;
+  } else {
+    logout.hidden = true;
+  }
 
   $('#pcards').innerHTML = projects.map((p) => {
     const pt = byProject[p.name] || [];

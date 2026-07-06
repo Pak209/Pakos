@@ -11,6 +11,7 @@ const { scan, PROJECTS_ROOT } = require('./lib/scanner');
 const { replaceScan, getState, getProject, DB_PATH } = require('./lib/db');
 const { getConfig, verifyBearer, CONFIG_PATH } = require('./lib/config');
 const { createMission, moveMission, BoardError } = require('./lib/board');
+const { verifyAccessJwt } = require('./lib/access');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
 const PORT = Number(process.env.PAKOS_PORT || 4180);
@@ -60,16 +61,18 @@ function json(res, code, body) {
   res.end(data);
 }
 
-// ── Auth + audit (v0.2 — pulled forward from the v0.4 roadmap slot) ─────────
-// Every non-GET route requires `Authorization: Bearer <authToken>` from
-// ~/.pakos/config.json. Identity at the network edge (who can reach this
-// server at all) is Cloudflare Access's job — see docs/REMOTE.md.
+// ── Auth + audit ─────────────────────────────────────────────────────────────
+// Two ways to authorize a write, tried in order:
+//   1. bearer token from ~/.pakos/config.json — bootstrap/admin fallback for
+//      loopback, Tailscale, and scripts;
+//   2. verified Cloudflare Access identity (lib/access.js) — the normal
+//      browser path once `access` is configured: the edge's Google login IS
+//      the credential, so the UI never needs the token.
 const AUDIT_PATH = path.join(__dirname, 'data', 'audit.log');
 
-function audit(req, action, detail) {
-  // Append-only trail of every authenticated write. The Cf-Access email is
-  // stamped by the edge; requests that bypass the tunnel show as "local".
-  const who = req.headers['cf-access-authenticated-user-email'] || 'local';
+function audit(who, action, detail) {
+  // Append-only trail of every authenticated write. `who` is the VERIFIED
+  // identity from authenticate() — never a raw header.
   const line = JSON.stringify({ at: new Date().toISOString(), action, detail, who });
   try {
     fs.mkdirSync(path.dirname(AUDIT_PATH), { recursive: true });
@@ -79,10 +82,36 @@ function audit(req, action, detail) {
   }
 }
 
-function requireAuth(req, res) {
-  if (verifyBearer(req.headers.authorization)) return true;
+// Resolves to { who } on success, null on failure (response already sent).
+async function authenticate(req, res) {
+  if (verifyBearer(req.headers.authorization)) return { who: 'token' };
+
+  const jwt = req.headers['cf-access-jwt-assertion'];
+  const { access } = getConfig();
+  if (jwt && access?.teamDomain && access?.audTag && access?.allowedEmails?.length) {
+    // CSRF guard: this path is cookie-derived (the edge turned the Access
+    // cookie into this header), so a cross-site POST would carry it too.
+    // Browsers always send Origin on POST — require it to match our host.
+    const origin = req.headers.origin;
+    if (origin) {
+      let originHost = null;
+      try { originHost = new URL(origin).host; } catch { /* fall through */ }
+      if (originHost !== req.headers.host) {
+        json(res, 403, { error: 'cross-origin write rejected' });
+        return null;
+      }
+    }
+    try {
+      const { email } = await verifyAccessJwt(jwt, access);
+      return { who: email };
+    } catch (err) {
+      json(res, 401, { error: `access identity rejected: ${err.message}` });
+      return null;
+    }
+  }
+
   json(res, 401, { error: 'unauthorized', hint: `token lives in ${CONFIG_PATH}` });
-  return false;
+  return null;
 }
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -133,10 +162,14 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/api/state' && req.method === 'GET') {
     const state = getState();
+    const { access } = getConfig();
+    const accessOn = !!(access?.teamDomain && access?.audTag && access?.allowedEmails?.length);
     return json(res, 200, {
       version: VERSION,
       projectsRoot: PROJECTS_ROOT,
       system: {
+        // teamDomain only — never the aud tag or allowlist
+        access: accessOn ? { enabled: true, teamDomain: access.teamDomain } : { enabled: false },
         node: process.version,
         db: fs.existsSync(DB_PATH),
         scanning,
@@ -165,31 +198,36 @@ const server = http.createServer((req, res) => {
   // (lib/board.js). Bearer-auth'd and audited like every other write.
   if ((url.pathname === '/api/missions' || url.pathname === '/api/missions/move') &&
       req.method === 'POST') {
-    if (!requireAuth(req, res)) return;
-    readBody(req)
-      .then((body) => {
-        const result = url.pathname === '/api/missions'
-          ? createMission(PROJECTS_ROOT, body)
-          : moveMission(PROJECTS_ROOT, body);
-        audit(req, url.pathname === '/api/missions' ? 'mission_create' : 'mission_move',
-          `${result.project}: ${result.title} → ${result.status}`);
-        runScan();
-        return json(res, 200, { ok: true, mission: result });
-      })
-      .catch((err) => {
-        const code = err instanceof BoardError ? err.code : 500;
-        if (code === 500) console.error('[pakos] mission write failed:', err);
-        return json(res, code, { error: err.message });
-      });
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      return readBody(req)
+        .then((body) => {
+          const result = url.pathname === '/api/missions'
+            ? createMission(PROJECTS_ROOT, body)
+            : moveMission(PROJECTS_ROOT, body);
+          audit(id.who, url.pathname === '/api/missions' ? 'mission_create' : 'mission_move',
+            `${result.project}: ${result.title} → ${result.status}`);
+          runScan();
+          return json(res, 200, { ok: true, mission: result });
+        })
+        .catch((err) => {
+          const code = err instanceof BoardError ? err.code : 500;
+          if (code === 500) console.error('[pakos] mission write failed:', err);
+          return json(res, code, { error: err.message });
+        });
+    });
     return;
   }
 
   if (url.pathname === '/api/scan' && req.method === 'POST') {
     // Read-only with respect to repositories: refreshes PakOS's own database.
-    if (!requireAuth(req, res)) return;
-    audit(req, 'scan', 'manual rescan');
-    runScan();
-    return json(res, 200, { ok: true, scannedAt: new Date().toISOString() });
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      audit(id.who, 'scan', 'manual rescan');
+      runScan();
+      return json(res, 200, { ok: true, scannedAt: new Date().toISOString() });
+    });
+    return;
   }
 
   if (req.method !== 'GET') { res.writeHead(405); return res.end('read-only'); }

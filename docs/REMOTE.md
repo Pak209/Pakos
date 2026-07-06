@@ -66,6 +66,53 @@ performs:
 - `curl -sI https://pakos.pak-labs.com` from anywhere should return a
   Cloudflare Access redirect (302 to the login page), never PakOS content.
 
+## Sign in with Google (no more token pasting)
+
+Once `access` is configured in `~/.pakos/config.json`, the Google login you
+do at the Cloudflare edge IS the write credential: PakOS verifies the
+signed identity (`Cf-Access-Jwt-Assertion`, RS256 against the team's
+published keys — `lib/access.js`) on every write, checks the email against
+an allowlist, and the UI never asks for a token. The bearer token remains
+the bootstrap/admin fallback for loopback, Tailscale, and scripts.
+Cloudflare manages the session cookie (httpOnly/Secure); PakOS stores no
+sessions and no OAuth secrets.
+
+### One-time setup
+
+1. **Google as a login method** (Zero Trust dashboard → Settings →
+   Authentication → Login methods → Add new → Google):
+   - In [Google Cloud Console](https://console.cloud.google.com) → APIs &
+     Services → Credentials → Create OAuth client ID (Web application).
+   - Authorized redirect URI: `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback`
+   - Paste the client ID + secret into the Cloudflare form. (These live in
+     Cloudflare, never in PakOS.)
+2. **Session length**: Access → Applications → the PakOS app → session
+   duration → **1 month** (Cloudflare's maximum). Enable Google in the
+   app's login methods; keep One-time PIN as backup.
+3. **Aud tag**: same app page → Overview → copy the Application Audience
+   (AUD) tag.
+4. **Server config** — add to `~/.pakos/config.json` and restart PakOS:
+
+```json
+"access": {
+  "teamDomain": "<team>.cloudflareaccess.com",
+  "audTag": "<the 64-hex AUD tag>",
+  "allowedEmails": ["you@example.com"]
+}
+```
+
+### Behavior and guarantees
+
+- Writes via Access identity are audited under the verified email; the
+  raw edge headers are never trusted without signature verification.
+- Cookie-derived writes require a same-host `Origin` (CSRF guard).
+- **Logout**: drawer → Sign out (`/cdn-cgi/access/logout` on the team
+  domain). **Revoke a session**: Zero Trust → My Team → Users → Revoke —
+  enforced at the edge immediately.
+- Sessions last up to 1 month; re-auth is one Google/Face ID tap.
+- If verification is unconfigured or fails, behavior is exactly the
+  token-only model — the JWT path never fails open.
+
 ## Operations
 
 - Status: `sudo launchctl list | grep cloudflared` · `cloudflared tunnel info pakos`
