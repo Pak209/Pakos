@@ -8,8 +8,9 @@ const path = require('node:path');
 const os = require('node:os');
 
 const { scan, PROJECTS_ROOT } = require('./lib/scanner');
-const { replaceScan, getState, DB_PATH } = require('./lib/db');
+const { replaceScan, getState, getProject, DB_PATH } = require('./lib/db');
 const { getConfig, verifyBearer, CONFIG_PATH } = require('./lib/config');
+const { createMission, moveMission, BoardError } = require('./lib/board');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
 const PORT = Number(process.env.PAKOS_PORT || 4180);
@@ -84,6 +85,25 @@ function requireAuth(req, res) {
   return false;
 }
 
+const MAX_BODY_BYTES = 16 * 1024;
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_BODY_BYTES) { reject(new BoardError(413, 'body too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks)) : {}); }
+      catch { reject(new BoardError(400, 'invalid JSON body')); }
+    });
+    req.on('error', reject);
+  });
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -128,6 +148,40 @@ const server = http.createServer((req, res) => {
       },
       ...state,
     });
+  }
+
+  // Per-project detail: full commit history, branch list, missions.
+  if (url.pathname.startsWith('/api/projects/') && req.method === 'GET') {
+    let name;
+    try { name = decodeURIComponent(url.pathname.slice('/api/projects/'.length)); }
+    catch { return json(res, 400, { error: 'bad project name' }); }
+    const detail = getProject(name);
+    if (!detail) return json(res, 404, { error: 'unknown project' });
+    return json(res, 200, detail);
+  }
+
+  // Mission writes — the only routes that modify anything outside PakOS's
+  // own data/, and they can only touch a project's .pakos/*.md board files
+  // (lib/board.js). Bearer-auth'd and audited like every other write.
+  if ((url.pathname === '/api/missions' || url.pathname === '/api/missions/move') &&
+      req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    readBody(req)
+      .then((body) => {
+        const result = url.pathname === '/api/missions'
+          ? createMission(PROJECTS_ROOT, body)
+          : moveMission(PROJECTS_ROOT, body);
+        audit(req, url.pathname === '/api/missions' ? 'mission_create' : 'mission_move',
+          `${result.project}: ${result.title} → ${result.status}`);
+        runScan();
+        return json(res, 200, { ok: true, mission: result });
+      })
+      .catch((err) => {
+        const code = err instanceof BoardError ? err.code : 500;
+        if (code === 500) console.error('[pakos] mission write failed:', err);
+        return json(res, code, { error: err.message });
+      });
+    return;
   }
 
   if (url.pathname === '/api/scan' && req.method === 'POST') {
