@@ -13,12 +13,13 @@ const { getConfig, verifyBearer, CONFIG_PATH } = require('./lib/config');
 const { createMission, moveMission, BoardError } = require('./lib/board');
 const { verifyAccessJwt } = require('./lib/access');
 const { getUsage } = require('./lib/usage');
+const crew = require('./lib/crew');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
 const PORT = Number(process.env.PAKOS_PORT || 4180);
 const SCAN_INTERVAL_MS = Number(process.env.PAKOS_SCAN_INTERVAL || 300) * 1000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 let scanning = false;
 let lastScanError = null;
@@ -224,6 +225,60 @@ const server = http.createServer((req, res) => {
           if (code === 500) console.error('[pakos] mission write failed:', err);
           return json(res, code, { error: err.message });
         });
+    });
+    return;
+  }
+
+  // ── Crew (docs/ROADMAP.md v0.2 slice; all writes behind auth + 2-step gate)
+  if (url.pathname === '/api/crew' && req.method === 'GET') {
+    const { crew: crewCfg } = getConfig(); // models + defaultAgent only — no secrets live here
+    return json(res, 200, { agents: crewCfg, runs: crew.listRuns() });
+  }
+
+  const runMatch = url.pathname.match(/^\/api\/crew\/runs\/([\w-]+)$/);
+  if (runMatch && req.method === 'GET') {
+    const run = crew.getRun(runMatch[1]);
+    return run ? json(res, 200, run) : json(res, 404, { error: 'unknown run' });
+  }
+
+  if (url.pathname === '/api/crew/dispatch' && req.method === 'POST') {
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      return readBody(req).then((body) => {
+        if (body.confirm && body.dispatchId) {
+          // Step 2: the human confirmed the exact preview — spawn. Board-
+          // bound missions move → In Progress here and → Review when the
+          // agent finishes; Done is never automated (docs/ROADMAP.md).
+          const result = crew.confirmDispatch(String(body.dispatchId), {
+            onEvent: (event, info, detail) => {
+              audit(`crew:${info.agent}`, event, detail ||
+                `${info.agent}/${info.model} ${info.mode} on ${info.project}: ${info.mission}`);
+              runScan(); // board/handoff changed — refresh the snapshot
+            },
+          });
+          if (result.error) return json(res, result.code || 400, { error: result.error });
+          audit(id.who, 'crew_dispatch', `${result.run.agent}/${result.run.model} ${result.run.mode} ` +
+            `on ${result.run.project}: ${result.run.mission}`);
+          runScan();
+          return json(res, 200, result.run);
+        }
+        // Step 1: preview only — nothing spawns, nothing is written.
+        const preview = crew.previewDispatch(body, getConfig(), PROJECTS_ROOT);
+        if (preview.error) return json(res, 400, { error: preview.error });
+        return json(res, 200, preview);
+      });
+    }).catch((err) => json(res, 400, { error: String(err.message || err) }));
+    return;
+  }
+
+  const cancelMatch = url.pathname.match(/^\/api\/crew\/runs\/([\w-]+)\/cancel$/);
+  if (cancelMatch && req.method === 'POST') {
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      const result = crew.cancelRun(cancelMatch[1]);
+      if (result.error) return json(res, result.code || 400, { error: result.error });
+      audit(id.who, 'crew_cancel', `run ${cancelMatch[1]}`);
+      return json(res, 200, result.run);
     });
     return;
   }

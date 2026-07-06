@@ -72,3 +72,36 @@ test('moveMission refuses non-.pakos sources', () => {
     }), (e) => e instanceof BoardError && e.code === 403, src);
   }
 });
+
+test('moveMission strips and preserves @owner tags (crew missions)', () => {
+  const r = root();
+  fs.mkdirSync(path.join(r, 'demo', '.pakos'), { recursive: true });
+  fs.writeFileSync(boardOf(r), '# Board\n\n## Ready\n\n- [ ] Fix the scanner @codex\n\n## Done\n');
+
+  // caller passes the stored (owner-stripped) title, line known
+  const res = moveMission(r, {
+    project: 'demo', sourceFile: '.pakos/board.md', line: 5,
+    title: 'Fix the scanner', toStatus: 'in_progress',
+  });
+  assert.equal(res.owner, 'codex');
+  const text = fs.readFileSync(boardOf(r), 'utf8');
+  assert.match(text, /## In Progress\n\n- \[ \] Fix the scanner @codex/);
+});
+
+test('moveMission locates by title when line is omitted; ambiguity is 409', () => {
+  const r = root();
+  fs.mkdirSync(path.join(r, 'demo', '.pakos'), { recursive: true });
+  fs.writeFileSync(boardOf(r), '# Board\n\n## In Progress\n\n- [ ] Ship v2 @codex\n\n## Done\n');
+
+  const res = moveMission(r, {
+    project: 'demo', sourceFile: '.pakos/board.md',
+    title: 'Ship v2', toStatus: 'review',
+  });
+  assert.equal(res.status, 'review');
+  assert.match(fs.readFileSync(boardOf(r), 'utf8'), /## Review\n\n- \[ \] Ship v2 @codex/);
+
+  fs.appendFileSync(boardOf(r), '\n## Backlog\n\n- [ ] Ship v2\n- [ ] Ship v2 @claude\n');
+  assert.throws(() => moveMission(r, {
+    project: 'demo', sourceFile: '.pakos/board.md', title: 'Ship v2', toStatus: 'done',
+  }), (e) => e.code === 409 && /ambiguous/.test(e.message));
+});

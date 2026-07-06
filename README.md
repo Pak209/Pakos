@@ -25,7 +25,8 @@ around how one person actually works, not a general-purpose tool.
 | **Missions** | tasks parsed from each project's markdown, shown as a board |
 | **Progress** | done-ratios, dirty/ahead/behind, activity from real commits |
 | **Daily Brief** | a computed summary of the last 24h across all projects |
-| **Crew** *(planned)* | AI agents that pick up missions via markdown handoffs — crew members, not the center of the app |
+| **Crew** | AI agents (Codex-first, Claude too) dispatched onto missions via markdown handoffs — human-triggered, two-step confirmed, never scheduled. Crew members, not the center of the app |
+| **Usage** | Codex/Claude subscription usage from local files only — no OAuth, no cookies (SuperGrok has no API; shown as such) |
 
 ## Quickstart
 
@@ -58,6 +59,9 @@ PakOS reads only these files per project: `TODO.md`, `ROADMAP.md`,
 - Headings choose the column: *Backlog/TODO/Planned · Ready/Next ·
   In Progress/WIP · Review/QA · Done/Shipped*.
 - `- [x]` always means Done, wherever it appears.
+- A trailing `@tag` (e.g. `… @codex`) assigns the mission to a crew
+  member; it's stripped from the title. Mid-line mentions and emails
+  are left alone.
 - In `README.md`, only sections with a status-like heading are parsed —
   ordinary docs bullets never become missions.
 - Full example: [`.pakos/board.md`](.pakos/board.md) in this repo.
