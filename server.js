@@ -14,6 +14,8 @@ const { createMission, moveMission, BoardError } = require('./lib/board');
 const { verifyAccessJwt } = require('./lib/access');
 const { getUsage } = require('./lib/usage');
 const crew = require('./lib/crew');
+const recommend = require('./lib/recommend');
+const { appendRejected } = require('./lib/memory');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
 const PORT = Number(process.env.PAKOS_PORT || 4180);
@@ -33,6 +35,12 @@ function runScan() {
     lastScanError = null;
     console.log(`[pakos] scanned ${result.projects.length} projects, ` +
       `${result.tasks.length} tasks in ${result.durationMs}ms`);
+    try {
+      const det = recommend.runDetectors(getState(), PROJECTS_ROOT);
+      if (det.created) console.log(`[pakos] detectors: ${det.created} new recommendation(s)`);
+    } catch (err) {
+      console.error('[pakos] detectors failed:', err.message);
+    }
   } catch (err) {
     lastScanError = String(err.message || err);
     console.error('[pakos] scan failed:', lastScanError);
@@ -225,6 +233,95 @@ const server = http.createServer((req, res) => {
           if (code === 500) console.error('[pakos] mission write failed:', err);
           return json(res, code, { error: err.message });
         });
+    });
+    return;
+  }
+
+  // ── Recommendations (docs/INTELLIGENCE.md §3 — propose only; the human
+  // accept below is the only path from suggestion to board change)
+  if (url.pathname === '/api/recommendations' && req.method === 'GET') {
+    return json(res, 200, { recommendations: recommend.listOpen() });
+  }
+
+  const recMatch = url.pathname.match(/^\/api\/recommendations\/([\w-]+)\/(accept|reject|snooze)$/);
+  if (recMatch && req.method === 'POST') {
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      return readBody(req).then((body) => {
+        const [, recId, action] = recMatch;
+        const rec = recommend.get(recId);
+        if (!rec) return json(res, 404, { error: 'unknown recommendation' });
+        if (rec.state !== 'suggested' && rec.state !== 'snoozed') {
+          return json(res, 409, { error: `recommendation is already ${rec.state}` });
+        }
+
+        if (action === 'accept') {
+          // Your tap = your move: applied under the caller's verified
+          // identity, any target column, recommendation as provenance.
+          const result = rec.kind === 'reconciliation'
+            ? moveMission(PROJECTS_ROOT, { project: rec.project, sourceFile: rec.source_file,
+                title: rec.title, toStatus: rec.suggested_status })
+            : createMission(PROJECTS_ROOT, { project: rec.project, title: rec.title, status: 'backlog' });
+          recommend.setState(recId, 'accepted');
+          audit(id.who, 'rec_accept',
+            `${rec.project}: [${rec.kind}] ${rec.title} → ${result.status} (rec ${recId})`);
+          runScan();
+          return json(res, 200, { ok: true, applied: result });
+        }
+        if (action === 'reject') {
+          appendRejected(PROJECTS_ROOT, rec.project,
+            { title: rec.title, kind: rec.kind, reason: body.reason, by: id.who });
+          recommend.setState(recId, 'rejected');
+          audit(id.who, 'rec_reject',
+            `${rec.project}: [${rec.kind}] ${rec.title}${body.reason ? ` — ${body.reason}` : ''}`);
+          return json(res, 200, { ok: true });
+        }
+        recommend.setState(recId, 'snoozed', { snoozeDays: Number(body.days) || undefined });
+        audit(id.who, 'rec_snooze', `${rec.project}: [${rec.kind}] ${rec.title}`);
+        return json(res, 200, { ok: true });
+      });
+    }).catch((err) => {
+      const code = err instanceof BoardError ? err.code : 500;
+      if (code === 500) console.error('[pakos] recommendation action failed:', err);
+      return json(res, code, { error: err.message });
+    });
+    return;
+  }
+
+  // Board reconciliation: one human click → one fixed-template, read-only
+  // analyze run; its validated JSON output becomes recommendations.
+  const reconMatch = url.pathname.match(/^\/api\/recon\/([^/]+)$/);
+  if (reconMatch && req.method === 'POST') {
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      let project;
+      try { project = decodeURIComponent(reconMatch[1]); }
+      catch { return json(res, 400, { error: 'bad project name' }); }
+      const result = crew.dispatchTemplate({
+        project,
+        mission: 'Board reconciliation audit',
+        prompt: recommend.reconPrompt(project),
+      }, getConfig(), PROJECTS_ROOT, {
+        onEvent: (event, info, detail) => audit(`crew:${info.agent}`, event, detail ||
+          `${info.agent}/${info.model} ${info.mode} on ${info.project}: ${info.mission}`),
+        onComplete: (run, stdout) => {
+          if (run.status !== 'complete') return;
+          const parsed = recommend.parseReconOutput(stdout);
+          if (parsed.error) {
+            audit(`crew:${run.agent}`, 'recon_parse_failed', `${project}: ${parsed.error}`);
+            return;
+          }
+          const { tasks } = getState();
+          const outcome = recommend.applyReconResults(project, parsed.entries, tasks,
+            { runId: run.id, projectsRoot: PROJECTS_ROOT });
+          audit(`crew:${run.agent}`, 'recon_complete',
+            `${project}: ${outcome.created.length} recommendation(s), ${outcome.dropped.length} dropped`);
+          runScan();
+        },
+      });
+      if (result.error) return json(res, result.code || 400, { error: result.error });
+      audit(id.who, 'recon_dispatch', `${project}: board reconciliation audit`);
+      return json(res, 200, result.run);
     });
     return;
   }

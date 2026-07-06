@@ -306,6 +306,23 @@
     max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
   .kcard .owner { color: var(--purple); font-weight: 700; }
 
+  /* recommendations */
+  .recrow { border: 1px solid var(--line); border-radius: 12px; margin-top: 8px; background: var(--glass-2); padding: 11px 12px; }
+  .recrow .rhead { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .reckind { font-size: 9px; letter-spacing: 1.2px; font-weight: 700; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 6px; background: rgba(167,139,250,.12); color: var(--purple); flex-shrink: 0; }
+  .reckind.warn { background: rgba(251,191,36,.10); color: var(--amber); }
+  .recrow .rtitle { font-size: 13px; flex: 1; min-width: 200px; }
+  .recmove { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .recmove b { color: var(--cyan); font-weight: 600; }
+  .recev { margin-top: 6px; font-size: 11.5px; color: var(--faint); }
+  .recev summary { cursor: pointer; color: var(--muted); list-style: none; }
+  .recbtns { display: flex; gap: 6px; margin-top: 9px; }
+  .recbtns .cbtn { padding: 6px 12px; font-size: 12px; }
+  .reconbar { display: flex; gap: 8px; align-items: center; }
+  .reconbar select { background: rgba(0,0,0,.35); color: var(--text); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 12px; -webkit-appearance: none; appearance: none; }
+
   .empty { color: var(--faint); font-size: 13px; padding: 6px 2px; }
   .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 60;
     background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -347,6 +364,16 @@
       <button class="newbtn" onclick="openNewMission()">＋ New Mission</button>
     </div>
     <div class="kanban" id="kcols"></div>
+  </section>
+
+  <section class="panel" id="recs">
+    <div class="sechead"><h2>Recommendations <span class="kcount" id="reccount">0</span></h2>
+      <div class="reconbar">
+        <select id="reconproject"></select>
+        <button class="cbtn" id="reconbtn" style="padding:5px 10px;font-size:12px">Reconcile ▸</button>
+      </div>
+    </div>
+    <div id="recfeed"><div class="empty">No open recommendations.</div></div>
   </section>
 
   <section class="panel" id="crew">
@@ -790,6 +817,80 @@ function renderUsage(u) {
   $('#usagestamp').textContent = 'as of ' + ago(u.generatedAt);
 }
 
+// ── Recommendations ────────────────────────────────────────────────────────
+const KIND_LABEL = { reconciliation: 'board', unpushed: 'unpushed', dirty: 'hygiene', missing_board: 'setup' };
+const COL_NAME = { backlog: 'BACKLOG', ready: 'READY', in_progress: 'IN PROGRESS', review: 'REVIEW', done: 'DONE' };
+let reconWatch = null;
+
+function renderRecs(recs) {
+  $('#reccount').textContent = recs.length;
+  $('#recfeed').innerHTML = recs.map((r) => `
+    <div class="recrow">
+      <div class="rhead">
+        <span class="reckind ${r.kind === 'reconciliation' ? '' : 'warn'}">${esc(KIND_LABEL[r.kind] || r.kind)}</span>
+        <span class="rtitle">${esc(r.title)}</span>
+        <span class="recmove">${esc(r.project)}${r.suggested_status
+          ? ` · ${esc(COL_NAME[r.current_status] || '')} → <b>${esc(COL_NAME[r.suggested_status] || r.suggested_status)}</b>`
+          : ' · new mission'}</span>
+      </div>
+      <details class="recev"><summary>why? ▸</summary>${r.evidence.map((e) => `<div>· ${esc(e)}</div>`).join('')}</details>
+      <div class="recbtns">
+        <button class="cbtn" onclick="recAct('${esc(r.id)}','accept')">✓ Accept</button>
+        <button class="cbtn ghost" onclick="recAct('${esc(r.id)}','reject')">✕ Reject</button>
+        <button class="cbtn ghost" onclick="recAct('${esc(r.id)}','snooze')">Snooze</button>
+      </div>
+    </div>`).join('') || '<div class="empty">No open recommendations.</div>';
+}
+
+async function loadRecs() {
+  try {
+    const data = await (await fetch('/api/recommendations')).json();
+    renderRecs(data.recommendations || []);
+  } catch { $('#recfeed').innerHTML = '<div class="empty">Recommendations unavailable.</div>'; }
+}
+
+async function recAct(id, action) {
+  const body = {};
+  if (action === 'reject') {
+    const reason = prompt('Why reject? (optional — recorded to .pakos/rejected.md)');
+    if (reason === null) return; // cancelled
+    if (reason.trim()) body.reason = reason.trim();
+  }
+  try {
+    const res = await apiPost(`/api/recommendations/${id}/${action}`, body);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return toast(data.error || `Failed (${res.status})`);
+    toast(action === 'accept' ? 'Applied ✓' : action === 'reject' ? 'Rejected — remembered' : 'Snoozed');
+    loadRecs();
+    if (action === 'accept') load();
+  } catch (err) { toast(err.message === 'unauthorized' ? 'Bad token' : 'Action failed'); }
+}
+
+$('#reconbtn').addEventListener('click', async () => {
+  const project = $('#reconproject').value;
+  if (!project) return;
+  try {
+    const res = await apiPost(`/api/recon/${encodeURIComponent(project)}`);
+    const run = await res.json().catch(() => ({}));
+    if (!res.ok) return toast(run.error || 'Reconcile failed');
+    toast(`Auditing ${project}'s board…`);
+    clearInterval(reconWatch);
+    let ticks = 0;
+    reconWatch = setInterval(async () => {
+      if (++ticks > 60) return clearInterval(reconWatch);
+      try {
+        const r = await (await fetch(`/api/crew/runs/${run.id}`)).json();
+        refreshCrew();
+        if (r.status !== 'running') {
+          clearInterval(reconWatch);
+          loadRecs();
+          toast(r.status === 'complete' ? 'Reconciliation done — see Recommendations' : `Audit ${r.status}`);
+        }
+      } catch { /* transient */ }
+    }, 5000);
+  } catch (err) { toast(err.message === 'unauthorized' ? 'Bad token' : 'Reconcile failed'); }
+});
+
 // ── Crew ───────────────────────────────────────────────────────────────────
 const RUN_COLORS = { running: 'var(--cyan)', complete: 'var(--teal)', error: 'var(--red)', cancelled: 'var(--gray)' };
 let crewAgents = null;      // { defaultAgent, models } from /api/crew
@@ -932,6 +1033,7 @@ async function load() {
     crewProjects = state.projects.map((p) => p.name);
     render(state);
     syncCrewForm();
+    fillSelect($('#reconproject'), crewProjects, true);
   } catch (err) {
     $('#systext').textContent = 'OFFLINE';
     $('#syspill').classList.add('warn');
@@ -943,6 +1045,7 @@ async function load() {
     $('#ucards').innerHTML = '<div class="empty">Usage unavailable.</div>';
   }
   refreshCrew();
+  loadRecs();
 }
 
 async function doRescan() {
