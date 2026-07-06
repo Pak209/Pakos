@@ -23,6 +23,10 @@ near-zero) dependencies, everything regenerable from git + markdown.
   human-triggered two-step (preview → confirm) dispatch of Codex/Claude
   onto a mission; handoff file convention `.pakos/handoff-<topic>.md`;
   run log polling + cancel. No scheduling, no auto-pickup.
+- Crew board lifecycle (human-gated at both ends): confirming a dispatch
+  moves the bound mission Ready → In Progress; the agent finishing cleanly
+  moves it → Review; failures/cancels stay In Progress; **Review → Done is
+  only ever a human move** — no code path automates it.
 - Interactive Mission Board (v0.4's write pulled forward too): create
   missions and move them between columns from the UI — guarded edits to
   `.pakos/*.md` board files only (`lib/board.js`), token-auth'd, audited,
@@ -30,17 +34,29 @@ near-zero) dependencies, everything regenerable from git + markdown.
   UI. Plus: internally-scrolling kanban columns, Daily Brief modal,
   per-project detail API, centered desktop layout, nav drawer.
 
-## v0.3 — Missions & depth + GitHub awareness (read-only)
+## v0.3 — GitHub-aware Rescan + missions & depth (read-only)
+
+GitHub-aware Rescan (spec agreed 2026-07):
+
+- **Opt-in per project**: a per-project `githubSync: true/false` setting
+  (config or `.pakos/`); disabled projects behave exactly as today.
+- **`git fetch` only** for enabled projects — hard guarantees: no working
+  tree changes, no push, no checkout, no merge/pull. Fetch updates
+  remote-tracking refs so ahead/behind is finally true.
+- **GitHub API**: open PRs, issues, CI status per project (via `gh` or a
+  read-only token in `~/.pakos/config.json`, server-side only).
+- **UI freshness labels**: every git-derived number is labeled **Local**
+  (as of last disk scan) vs **GitHub** (as of last sync), with timestamps —
+  no number pretends to be fresher than it is.
+- Activity feed merges local commits + remote events.
+
+Also in v0.3:
 
 - Per-project detail view: commit history, branch list, mission sources
   *(moved from v0.2)*.
 - Daily Brief generator: markdown digest written to `.pakos/briefs/`,
   rendered in the UI *(moved from v0.2; still human-triggered)*.
 - UI: reduced-motion support, pull-to-refresh, better empty states.
-- Opt-in `git fetch` per project (still never mutates working trees) for
-  true ahead/behind.
-- GitHub API (via `gh` or token): open PRs, issues, CI status per project.
-- Activity feed merges local commits + remote events.
 
 ## v0.4 — Mission write-back
 

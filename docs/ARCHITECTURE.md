@@ -30,14 +30,22 @@ npm dependencies. Everything runs locally; nothing leaves the machine.
 | **Mission** | a task parsed from `TODO.md` / `ROADMAP.md` / `README.md` / `.pakos/*.md` | first-class unit of work with status, owner, and history |
 | **Progress** | done-ratio per project, dirty/ahead/behind counts | trend lines, per-mission burndown |
 | **Daily Brief** | one computed summary line | generated markdown digest, delivered on schedule |
-| **Crew** | — | AI agents (Lex, Fable, Codex, …) attached to missions via handoff files; agents are crew members, not the center of the app |
-| **Handoff** | — | `.pakos/handoff-*.md` convention: structured context an agent writes for the next agent or the human |
+| **Crew** | dispatch Codex/Claude onto a mission: preview → confirm → run, models allowlisted in config, no scheduler | richer panel: last-touched, handoffs awaiting pickup (v0.5) |
+| **Handoff** | `.pakos/handoff-*.md` written by PakOS at dispatch; the agent's result is appended on completion | agents/humans leaving context for each other |
 
 ## Components
 
 - **`server.js`** — HTTP server, static file serving (traversal-guarded,
-  no dotfiles), the two API routes, and the rescan timer. Read-only by
-  design: the only non-GET route refreshes PakOS's own database.
+  no dotfiles), the API routes, and the rescan timer. Non-GET routes are
+  bearer-auth'd and audited (`data/audit.log`).
+- **`lib/config.js`** — `~/.pakos/config.json` (0600): generated auth
+  token, crew model allowlists, optional provider API keys. Never served.
+- **`lib/crew.js`** — two-step agent dispatch (preview → confirm), spawn
+  via argv arrays (no shell), per-mode sandboxing, run log ring buffer,
+  handoff read/append — the only writes outside PakOS's own repo, and
+  they only ever touch `.pakos/` files.
+- **`lib/usage.js`** — subscription usage from local session/transcript
+  files; provider usage APIs only when the user adds admin keys.
 - **`lib/scanner.js`** — walks `$PAKOS_ROOT` one level deep. For each git
   repo it runs a fixed whitelist of read commands (`branch`, `status`,
   `rev-list`, `remote get-url`, `log`) via `execFile` — no shell, no

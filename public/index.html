@@ -276,6 +276,36 @@
   .bar i.crit { background: linear-gradient(90deg, var(--red), var(--red)); }
   .unote { margin-top: 9px; font-size: 11.5px; color: var(--faint); }
 
+  /* crew */
+  .crewform { display: grid; gap: 8px; }
+  .crewform .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .crewform select, .crewform input {
+    width: 100%; background: rgba(0,0,0,.35); color: var(--text);
+    border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px;
+    font: inherit; font-size: 13.5px; -webkit-appearance: none; appearance: none;
+  }
+  .crewform label { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px; }
+  .cbtn { border: 1px solid var(--line-strong); color: var(--cyan); background: rgba(34,211,238,.06);
+    font: inherit; font-size: 13.5px; font-weight: 600; border-radius: 10px; padding: 11px 14px; cursor: pointer; }
+  .cbtn.warn { color: var(--amber); border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.06); }
+  .cbtn.ghost { color: var(--muted); background: none; }
+  .cbtn:disabled { opacity: .4; cursor: default; }
+  .previewbox { background: rgba(0,0,0,.4); border: 1px solid rgba(251,191,36,.35); border-radius: 12px; padding: 12px; }
+  .previewbox .pv { font-family: var(--mono); font-size: 11.5px; color: var(--muted); word-break: break-all; margin-top: 6px; }
+  .previewbox .pv b { color: var(--text); font-weight: 600; }
+  .previewbox .sandbox { color: var(--amber); font-size: 12px; margin-top: 8px; }
+  .runrow { border: 1px solid var(--line); border-radius: 12px; margin-top: 8px; background: var(--glass-2); }
+  .runrow summary { list-style: none; cursor: pointer; display: flex; gap: 10px; align-items: center; padding: 11px 12px; }
+  .runrow summary::-webkit-details-marker { display: none; }
+  .runrow .rdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .runrow .rmeta { flex: 1; min-width: 0; }
+  .runrow .rt { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .runrow .rs { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .runlog { margin: 0 12px 10px; padding: 10px; background: rgba(0,0,0,.5); border: 1px solid var(--line);
+    border-radius: 10px; font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--muted);
+    max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+  .kcard .owner { color: var(--purple); font-weight: 700; }
+
   .empty { color: var(--faint); font-size: 13px; padding: 6px 2px; }
   .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 60;
     background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -317,6 +347,36 @@
       <button class="newbtn" onclick="openNewMission()">＋ New Mission</button>
     </div>
     <div class="kanban" id="kcols"></div>
+  </section>
+
+  <section class="panel" id="crew">
+    <div class="sechead"><h2>Crew</h2><span class="link" id="crewstatus"></span></div>
+    <div class="crewform" id="crewform">
+      <div class="frow">
+        <div><label>Project</label><select id="cproject"></select></div>
+        <div><label>Agent</label><select id="cagent"></select></div>
+      </div>
+      <div class="frow">
+        <div><label>Model</label><select id="cmodel"></select></div>
+        <div><label>Mode</label><select id="cmode">
+          <option value="analyze">analyze — read-only</option>
+          <option value="implement">implement — can edit project</option>
+        </select></div>
+      </div>
+      <div><label>Mission</label><input id="cmission" placeholder="What should the crew member do?" maxlength="500"></div>
+      <div class="mnote" id="clink" hidden></div>
+      <button class="cbtn" id="cpreview">Preview dispatch</button>
+      <div class="previewbox" id="cpreviewbox" hidden>
+        <div style="font-size:12px;font-weight:700;color:var(--amber);letter-spacing:1px">CONFIRM DISPATCH</div>
+        <div class="pv" id="cpreviewtext"></div>
+        <div class="sandbox" id="csandbox"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="cbtn warn" id="cconfirm" style="flex:1">Confirm &amp; run</button>
+          <button class="cbtn ghost" id="cdiscard">Discard</button>
+        </div>
+      </div>
+    </div>
+    <div id="cruns"></div>
   </section>
 
   <div class="grid2">
@@ -477,7 +537,8 @@ function openMove(taskId) {
   $('#mvBody').innerHTML = movable
     ? `<div class="movegrid">${COLS.filter(([k]) => k !== t.status).map(([k, l, c]) =>
         `<button class="btn" onclick="doMove(${t.id}, '${k}')">
-           <span class="cdot" style="background:${c}"></span>Move to ${l}</button>`).join('')}</div>`
+           <span class="cdot" style="background:${c}"></span>Move to ${l}</button>`).join('')}</div>
+       <div class="mrow"><button class="btn primary" onclick="crewFromMission(${t.id})">⚙ Dispatch crew on this…</button></div>`
     : `<div class="mnote">Read-only: this mission lives in ${esc(t.source_file)}.
        PakOS only writes to .pakos/board.md — edit the source file directly,
        or recreate it as a board mission.</div>
@@ -619,7 +680,7 @@ function render(state) {
         <button class="kadd" onclick="openNewMission('${key}')" aria-label="Add to ${label}">＋</button></div>
       <div class="kcards">
         ${items.map((t) => `<button class="kcard" onclick="openMove(${t.id})"><div class="t">${esc(t.title)}</div>
-          <div class="p"><span class="dot"></span>${esc(t.project)}
+          <div class="p"><span class="dot"></span>${esc(t.project)}${t.owner ? ` <span class="owner">@${esc(t.owner)}</span>` : ''}
           ${t.source_file.startsWith('.pakos/') ? '' : '<span class="lock">🔒 ' + esc(t.source_file) + '</span>'}</div></button>`).join('')
           || '<div class="kmore">no missions</div>'}
       </div>
@@ -729,11 +790,149 @@ function renderUsage(u) {
   $('#usagestamp').textContent = 'as of ' + ago(u.generatedAt);
 }
 
+// ── Crew ───────────────────────────────────────────────────────────────────
+const RUN_COLORS = { running: 'var(--cyan)', complete: 'var(--teal)', error: 'var(--red)', cancelled: 'var(--gray)' };
+let crewAgents = null;      // { defaultAgent, models } from /api/crew
+let crewProjects = [];      // names from /api/state
+let crewPoll = null;
+let openRunId = null;
+
+function fillSelect(sel, values, keep) {
+  const prev = keep ? sel.value : null;
+  sel.innerHTML = values.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  if (prev && values.includes(prev)) sel.value = prev;
+}
+
+function syncCrewForm() {
+  if (!crewAgents) return;
+  fillSelect($('#cproject'), crewProjects, true);
+  fillSelect($('#cagent'), Object.keys(crewAgents.models), true);
+  if (!$('#cagent').dataset.touched) $('#cagent').value = crewAgents.defaultAgent;
+  fillSelect($('#cmodel'), crewAgents.models[$('#cagent').value] || [], true);
+}
+
+function renderRuns(runsList) {
+  const running = runsList.filter((r) => r.status === 'running').length;
+  $('#crewstatus').textContent = running ? `${running} running` : '';
+  $('#cruns').innerHTML = runsList.slice(0, 8).map((r) => `
+    <details class="runrow" data-run="${esc(r.id)}" ${r.id === openRunId ? 'open' : ''}>
+      <summary>
+        <span class="rdot" style="background:${RUN_COLORS[r.status] || 'var(--gray)'};${r.status === 'running' ? 'box-shadow:0 0 8px var(--cyan);animation:glowpulse 1.5s infinite' : ''}"></span>
+        <span class="rmeta"><span class="rt">${esc(r.mission)}</span><br>
+          <span class="rs">${esc(r.project)} · ${esc(r.agent)}/${esc(r.model)} · ${esc(r.mode)} · ${esc(r.status)} · ${ago(r.startedAt)}</span></span>
+        ${r.status === 'running' ? `<button class="cbtn ghost" data-cancel="${esc(r.id)}" style="padding:6px 10px;font-size:12px">Cancel</button>` : ''}
+      </summary>
+      <div class="runlog" data-log="${esc(r.id)}">…</div>
+    </details>`).join('') || '<div class="empty">No crew runs yet — dispatch one above.</div>';
+
+  document.querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    try {
+      const res = await apiPost(`/api/crew/runs/${b.dataset.cancel}/cancel`);
+      toast(res.ok ? 'Run cancelled' : 'Cancel failed');
+      refreshCrew();
+    } catch (err) { toast('Cancel failed: ' + err.message); }
+  }));
+  document.querySelectorAll('.runrow').forEach((d) => d.addEventListener('toggle', () => {
+    if (d.open) { openRunId = d.dataset.run; loadRunLog(openRunId); }
+    else if (openRunId === d.dataset.run) openRunId = null;
+  }));
+  if (openRunId) loadRunLog(openRunId);
+}
+
+async function loadRunLog(id) {
+  const box = document.querySelector(`[data-log="${id}"]`);
+  if (!box) return;
+  try {
+    const run = await (await fetch(`/api/crew/runs/${id}`)).json();
+    box.textContent = (run.log || []).map((l) => `${l.at.slice(11, 19)} ${l.line}`).join('\n') || 'no output yet…';
+    box.scrollTop = box.scrollHeight;
+  } catch { box.textContent = 'log unavailable'; }
+}
+
+async function refreshCrew() {
+  try {
+    const data = await (await fetch('/api/crew')).json();
+    crewAgents = data.agents;
+    syncCrewForm();
+    renderRuns(data.runs || []);
+    const anyRunning = (data.runs || []).some((r) => r.status === 'running');
+    if (anyRunning && !crewPoll) crewPoll = setInterval(refreshCrew, 2500);
+    if (!anyRunning && crewPoll) { clearInterval(crewPoll); crewPoll = null; }
+  } catch { $('#cruns').innerHTML = '<div class="empty">Crew unavailable.</div>'; }
+}
+
+let pendingDispatch = null;
+let linkedMission = null; // board binding: dispatch moves it In Progress → Review
+
+function crewFromMission(taskId) {
+  const t = STATE?.tasks.find((x) => x.id === taskId);
+  if (!t || !t.source_file.startsWith('.pakos/')) return;
+  closeModals();
+  linkedMission = { project: t.project, sourceFile: t.source_file, line: t.line, title: t.title };
+  $('#cproject').value = t.project;
+  $('#cmission').value = t.title;
+  const link = $('#clink');
+  link.hidden = false;
+  link.innerHTML = `⛓ Linked to board mission — confirm moves it to <b>In Progress</b>, ` +
+    `agent success to <b>Review</b> (Done stays yours). ` +
+    `<button class="cbtn ghost" style="padding:2px 8px;font-size:11px" onclick="unlinkMission()">unlink</button>`;
+  goto('#crew');
+}
+function unlinkMission() { linkedMission = null; $('#clink').hidden = true; }
+$('#cmission').addEventListener('input', unlinkMission);
+$('#cproject').addEventListener('change', unlinkMission);
+
+$('#cagent').addEventListener('change', () => { $('#cagent').dataset.touched = '1'; syncCrewForm(); });
+$('#cpreview').addEventListener('click', async () => {
+  const body = {
+    project: $('#cproject').value, agent: $('#cagent').value,
+    model: $('#cmodel').value, mode: $('#cmode').value,
+    mission: $('#cmission').value.trim(),
+  };
+  if (linkedMission && linkedMission.project === body.project) {
+    body.missionRef = { sourceFile: linkedMission.sourceFile,
+      line: linkedMission.line, title: linkedMission.title };
+  }
+  if (!body.mission) return toast('Describe the mission first');
+  try {
+    const res = await apiPost('/api/crew/dispatch', body); // step 1: nothing runs
+    const p = await res.json();
+    if (!res.ok) return toast(p.error || 'Preview failed');
+    pendingDispatch = p;
+    $('#cpreviewtext').innerHTML =
+      `<b>${esc(p.agent)}/${esc(p.model)}</b> · ${esc(p.mode)} · in <b>${esc(p.project)}</b><br>` +
+      `handoff: ${esc(p.handoffFile)}<br>$ ${esc(p.argv.join(' '))}`;
+    $('#csandbox').innerHTML = '⚠ ' + esc(p.sandbox) +
+      (p.boardMove ? `<br>▦ ${esc(p.boardMove)}` : '');
+    $('#cpreviewbox').hidden = false;
+  } catch (err) { toast('Preview failed: ' + err.message); }
+});
+$('#cdiscard').addEventListener('click', () => { pendingDispatch = null; $('#cpreviewbox').hidden = true; });
+$('#cconfirm').addEventListener('click', async () => {
+  if (!pendingDispatch) return;
+  try {
+    const res = await apiPost('/api/crew/dispatch', { dispatchId: pendingDispatch.dispatchId, confirm: true });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return toast(data.error || `Dispatch failed (${res.status})`);
+    pendingDispatch = null;
+    $('#cpreviewbox').hidden = true;
+    $('#cmission').value = '';
+    unlinkMission();
+    toast('Crew dispatched ✓');
+    refreshCrew();
+    load(); // board may have moved the mission to In Progress
+  } catch (err) { toast('Dispatch failed: ' + err.message); }
+});
+
 async function load() {
   try {
     const res = await fetch('/api/state');
-    render(await res.json());
-  } catch {
+    const state = await res.json();
+    crewProjects = state.projects.map((p) => p.name);
+    render(state);
+    syncCrewForm();
+  } catch (err) {
     $('#systext').textContent = 'OFFLINE';
     $('#syspill').classList.add('warn');
   }
@@ -743,6 +942,7 @@ async function load() {
   } catch {
     $('#ucards').innerHTML = '<div class="empty">Usage unavailable.</div>';
   }
+  refreshCrew();
 }
 
 async function doRescan() {
