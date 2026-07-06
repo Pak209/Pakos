@@ -23,6 +23,12 @@ near-zero) dependencies, everything regenerable from git + markdown.
   human-triggered two-step (preview → confirm) dispatch of Codex/Claude
   onto a mission; handoff file convention `.pakos/handoff-<topic>.md`;
   run log polling + cancel. No scheduling, no auto-pickup.
+- Interactive Mission Board (v0.4's write pulled forward too): create
+  missions and move them between columns from the UI — guarded edits to
+  `.pakos/*.md` board files only (`lib/board.js`), token-auth'd, audited,
+  stale-view-safe. Missions parsed from other files stay read-only in the
+  UI. Plus: internally-scrolling kanban columns, Daily Brief modal,
+  per-project detail API, centered desktop layout, nav drawer.
 
 ## v0.3 — Missions & depth + GitHub awareness (read-only)
 

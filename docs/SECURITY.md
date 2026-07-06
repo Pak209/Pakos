@@ -12,11 +12,19 @@ cloned could contain hostile markdown/filenames), and supply chain.
 
 ## Guarantees (v0.2)
 
-1. **Read-only against repositories.** The full set of executed git
+1. **Read-only against repository content.** The full set of executed git
    commands: `branch`, `status --porcelain`, `rev-list`, `remote get-url`,
-   `log`. All run via `execFile` (argv array, no shell) with fixed
-   arguments and an 8s timeout. There is no code path that writes to a
-   scanned repo — no fetch, pull, commit, push, or checkout.
+   `log`, `for-each-ref`. All run via `execFile` (argv array, no shell)
+   with fixed arguments and an 8s timeout. There is no code path that
+   writes to a scanned repo's code or git state — no fetch, pull, commit,
+   push, or checkout. The single exception is `lib/board.js`, the only
+   module allowed to write into a project, and only to `.pakos/*.md`
+   board files: project names must be direct children of the root (no
+   separators, no dotfiles), the source path must match `.pakos/*.md`
+   exactly, writes are atomic (temp + rename), and moves are verified
+   against the caller's view of the line (409 on mismatch) so concurrent
+   hand-edits can't be clobbered. Mission writes require the bearer token
+   and land in the audit log like every other write.
 2. **Loopback by default.** Binds `127.0.0.1` unless `PAKOS_HOST` is set.
    Remote access goes over Tailscale (WireGuard, tailnet-only) or a
    Cloudflare Tunnel fronted by Cloudflare Access (docs/REMOTE.md) — both

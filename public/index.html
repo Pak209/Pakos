@@ -30,8 +30,10 @@
     background: var(--bg); color: var(--text);
     font: 15px/1.45 -apple-system, "SF Pro Text", system-ui, sans-serif;
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
   }
   a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 
   @keyframes pulse { 50% { opacity: .3; } }
   @keyframes glowpulse { 50% { box-shadow: 0 0 2px var(--teal); opacity: .55; } }
@@ -40,16 +42,19 @@
   }
 
   header.top {
-    display: flex; align-items: center; gap: 12px;
-    padding: 14px 16px 10px; position: sticky; top: 0; z-index: 20;
+    position: sticky; top: 0; z-index: 20;
     background: rgba(0, 0, 0, .72);
     backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border-bottom: 1px solid var(--line);
   }
-  .burger { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 6px 0; border-right: 1px solid var(--line); }
+  .topin {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px 10px; max-width: 1200px; margin: 0 auto;
+  }
+  .burger { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px 8px 2px; border-right: 1px solid var(--line); }
   .burger span { display: block; width: 22px; height: 2px; background: var(--text); border-radius: 2px; }
   .burger span:nth-child(2) { width: 15px; }
-  .logo { flex: 1; }
+  .logo { flex: 1; min-width: 0; }
   .logo .word { font-family: var(--mono); font-weight: 800; font-size: 20px; letter-spacing: 1px; }
   .logo .word em { font-style: normal; color: var(--cyan); text-shadow: 0 0 14px rgba(34, 211, 238, .45); }
   .logo .sub { font-size: 9.5px; letter-spacing: 3.5px; color: var(--muted); font-weight: 600; }
@@ -71,16 +76,22 @@
     display: grid; place-items: center; font-weight: 700; font-size: 13px; font-family: var(--mono);
   }
 
-  main { padding: 12px 12px 0; display: grid; gap: 12px; max-width: 1100px; margin: 0 auto; }
+  main { padding: 12px 12px 0; display: grid; gap: 12px; width: 100%; max-width: 1200px; margin: 0 auto; }
+  main > * { min-width: 0; }
   section.panel {
+    min-width: 0;
     background: var(--glass); border: 1px solid var(--line); border-radius: 16px; padding: 14px;
     backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     background-image: linear-gradient(180deg, rgba(94, 234, 212, .04), transparent 26%);
   }
-  .sechead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .sechead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; }
   .sechead h2 { font-size: 11px; letter-spacing: 2px; color: var(--cyan); font-weight: 700; text-transform: uppercase; }
-  .sechead .link { font-size: 12.5px; color: var(--muted); }
+  .sechead .link { font-size: 12.5px; color: var(--muted); background: none; border: none; }
   .sechead .link:active { color: var(--cyan); }
+  .newbtn {
+    border: 1px solid var(--line-strong); color: var(--cyan); border-radius: 9px;
+    padding: 5px 12px; font-size: 12.5px; background: rgba(34, 211, 238, .05);
+  }
 
   .hscroll { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; scrollbar-width: none; }
   .hscroll::-webkit-scrollbar { display: none; }
@@ -88,14 +99,17 @@
   .pcard {
     min-width: 236px; max-width: 260px; flex-shrink: 0; scroll-snap-align: start;
     background: var(--glass-2); border: 1px solid var(--line); border-radius: 14px; padding: 13px;
+    text-align: left; display: block; transition: border-color .18s ease-out;
   }
+  .pcard:active { border-color: var(--line-strong); }
   .pcard .head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
   .picon {
-    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0;
     font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: .5px;
     color: var(--cyan); background: rgba(34, 211, 238, .07); border: 1px solid var(--line-strong);
   }
-  .pcard .name { font-weight: 700; font-size: 15px; letter-spacing: .3px; text-transform: uppercase; }
+  .pcard .name { font-weight: 700; font-size: 15px; letter-spacing: .3px; text-transform: uppercase;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pcard .desc { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; }
   .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -109,9 +123,8 @@
   .pstats span { display: inline-flex; gap: 5px; align-items: center; color: var(--text); }
   .ok { color: var(--teal); } .warn { color: var(--amber); } .dim { color: var(--muted); }
 
-  .actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-  .action { background: none; border: none; color: var(--text); font: inherit; cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 2px; border-radius: 12px;
+  .actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 640px; margin: 0 auto; }
+  .action { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 2px; border-radius: 12px;
     transition: background .18s ease-out; }
   .action:active { background: rgba(34, 211, 238, .07); }
   .action .ic {
@@ -124,22 +137,34 @@
 
   .kanban { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 4px; scrollbar-width: none; }
   .kanban::-webkit-scrollbar { display: none; }
-  .kcol { min-width: 200px; max-width: 220px; flex-shrink: 0; scroll-snap-align: start;
-    background: var(--glass-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .kcol { min-width: 210px; max-width: 232px; flex: 1 0 210px; scroll-snap-align: start;
+    background: var(--glass-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; }
   .kcol .top { height: 2px; opacity: .85; }
-  .kcol .khead { display: flex; align-items: center; justify-content: space-between; padding: 10px 11px 8px; }
-  .kcol .khead h3 { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; }
+  .kcol .khead { display: flex; align-items: center; gap: 7px; padding: 10px 11px 8px; }
+  .kcol .khead h3 { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; flex: 1; }
   .kcount { font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 9px; background: rgba(255,255,255,.07); }
-  .kcards { padding: 0 8px 8px; display: grid; gap: 7px; }
-  .kcard { background: rgba(0, 0, 0, .35); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; }
+  .kadd { color: var(--muted); font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 7px; }
+  .kadd:active { color: var(--cyan); background: rgba(34,211,238,.08); }
+  .kcards { padding: 0 8px 8px; display: grid; gap: 7px; align-content: start;
+    max-height: min(56vh, 520px); overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: rgba(94,234,212,.25) transparent; }
+  .kcards::-webkit-scrollbar { width: 4px; }
+  .kcards::-webkit-scrollbar-thumb { background: rgba(94,234,212,.22); border-radius: 2px; }
+  .kcards::-webkit-scrollbar-track { background: transparent; }
+  .kcard { background: rgba(0, 0, 0, .35); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px;
+    text-align: left; width: 100%; transition: border-color .18s ease-out; }
+  .kcard:active { border-color: var(--line-strong); }
   .kcard .t { font-size: 12.5px; line-height: 1.35; }
-  .kcard .p { margin-top: 7px; display: inline-flex; align-items: center; gap: 5px;
+  .kcard .p { margin-top: 7px; display: flex; align-items: center; gap: 5px;
     font-size: 9.5px; letter-spacing: 1px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
-  .kcard .p .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); }
+  .kcard .p .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); flex-shrink: 0; }
+  .kcard .p .lock { margin-left: auto; color: var(--faint); font-size: 10px; letter-spacing: 0; text-transform: none; }
   .kmore { font-size: 11.5px; color: var(--faint); padding: 2px 2px 4px; }
 
   .grid2 { display: grid; gap: 12px; }
   @media (min-width: 760px) { .grid2 { grid-template-columns: 5fr 7fr; } }
+  .grid2 > section { min-width: 0; }
 
   .sysrow { display: flex; align-items: center; gap: 11px; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
   .sysrow:last-of-type { border-bottom: none; }
@@ -147,11 +172,10 @@
   .sysrow .nm { flex: 1; }
   .sysrow .val { color: var(--teal); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
   .sysrow .val.bad { color: var(--amber); }
-  .logsbtn { margin-top: 10px; width: 100%; text-align: left; background: rgba(0,0,0,.3); color: var(--text);
-    border: 1px solid var(--line); border-radius: 11px; padding: 11px 13px; font: inherit; font-size: 13.5px;
-    display: flex; justify-content: space-between; cursor: pointer; }
+  .logsbtn { margin-top: 10px; width: 100%; text-align: left; background: rgba(0,0,0,.3);
+    border: 1px solid var(--line); border-radius: 11px; padding: 11px 13px; font-size: 13.5px;
+    display: flex; justify-content: space-between; }
 
-  .feed { position: relative; }
   .feeditem { display: flex; gap: 11px; padding: 8px 0; }
   .feeditem .fic { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
     display: grid; place-items: center; font-size: 14px; color: var(--cyan);
@@ -166,60 +190,116 @@
   .brief .bt { font-size: 12px; letter-spacing: 1.5px; color: var(--cyan); font-weight: 700; }
   .brief .bs { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
   .brief .go { margin-left: auto; border: 1px solid var(--line-strong); color: var(--cyan); background: rgba(34,211,238,.05);
-    font: inherit; font-size: 13px; border-radius: 10px; padding: 9px 14px; cursor: pointer; white-space: nowrap; }
+    font-size: 13px; border-radius: 10px; padding: 9px 14px; white-space: nowrap; }
 
   nav.bottom {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    display: flex; justify-content: space-around;
     background: rgba(0, 0, 0, .78);
     backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border-top: 1px solid var(--line);
     padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
   }
+  .navin { display: flex; justify-content: space-around; max-width: 640px; margin: 0 auto; }
   nav.bottom a { display: flex; flex-direction: column; align-items: center; gap: 3px;
     font-size: 10.5px; color: var(--muted); padding: 4px 10px; border-radius: 10px;
     transition: color .18s ease-out; }
   nav.bottom a.on { color: var(--cyan); background: rgba(34, 211, 238, .07); }
   nav.bottom .nic { font-size: 17px; }
 
+  /* drawer */
+  .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.55);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease-out; }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 41; width: min(290px, 82vw);
+    background: var(--glass); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+    border-right: 1px solid var(--line-strong); padding: 22px 16px;
+    transform: translateX(-102%); transition: transform .2s ease-out;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .drawer.show { transform: translateX(0); }
+  .drawer .dhead { font-family: var(--mono); font-weight: 800; font-size: 18px; margin-bottom: 14px; }
+  .drawer .dhead em { font-style: normal; color: var(--cyan); }
+  .drawer a, .drawer button.ditem { display: flex; align-items: center; gap: 12px; padding: 11px 10px;
+    border-radius: 10px; font-size: 14px; color: var(--text); text-align: left; }
+  .drawer a:active, .drawer button.ditem:active { background: rgba(34,211,238,.08); }
+  .drawer .dic { width: 20px; text-align: center; color: var(--cyan); font-family: var(--mono); }
+  .drawer .dfoot { margin-top: auto; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+
+  /* modals & sheets */
+  .modal { position: fixed; inset: 0; z-index: 50; display: none; align-items: flex-end; justify-content: center;
+    background: rgba(0,0,0,.6); }
+  .modal.show { display: flex; }
+  @media (min-width: 600px) { .modal { align-items: center; } }
+  .mbox {
+    width: 100%; max-width: 480px; max-height: 82vh; overflow-y: auto;
+    background: var(--glass); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+    border: 1px solid var(--line-strong); border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  @media (min-width: 600px) { .mbox { border-radius: 18px; } }
+  .mhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .mhead h3 { font-size: 12px; letter-spacing: 2px; color: var(--cyan); text-transform: uppercase; }
+  .mclose { color: var(--muted); font-size: 20px; padding: 2px 8px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%; background: rgba(0,0,0,.4); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 11px 12px; font: inherit; -webkit-appearance: none; appearance: none;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--cyan); }
+  .mrow { display: flex; gap: 8px; margin-top: 14px; }
+  .btn { flex: 1; border-radius: 11px; padding: 12px; font-size: 14px; text-align: center; border: 1px solid var(--line); color: var(--muted); }
+  .btn.primary { border-color: var(--line-strong); color: var(--cyan); background: rgba(34,211,238,.07); }
+  .movegrid { display: grid; gap: 7px; }
+  .movegrid .btn { text-align: left; display: flex; align-items: center; gap: 10px; }
+  .movegrid .cdot { width: 8px; height: 8px; border-radius: 50%; }
+  .msrc { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin: 4px 0 12px; }
+  .mnote { font-size: 12.5px; color: var(--amber); margin-bottom: 10px; }
+  .brieflist { display: grid; gap: 10px; }
+  .brieflist .bl { border-left: 2px solid var(--line-strong); padding-left: 10px; }
+  .brieflist .bl b { color: var(--cyan); font-size: 13px; }
+  .brieflist .bl div { font-size: 12.5px; color: var(--muted); }
+
   .empty { color: var(--faint); font-size: 13px; padding: 6px 2px; }
-  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 60;
     background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    border: 1px solid var(--line-strong); color: var(--text);
-    border-radius: 12px; padding: 10px 16px; font-size: 13px; z-index: 40; opacity: 0; transition: opacity .2s ease-out; pointer-events: none; }
+    border: 1px solid var(--line-strong); color: var(--text); max-width: min(420px, 90vw);
+    border-radius: 12px; padding: 10px 16px; font-size: 13px; opacity: 0; transition: opacity .2s ease-out; pointer-events: none; }
   .toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 
-<header class="top">
-  <div class="burger"><span></span><span></span><span></span></div>
+<header class="top"><div class="topin">
+  <button class="burger" id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
   <div class="logo">
     <div class="word">PAK<em>OS</em></div>
     <div class="sub">COMMAND CENTER</div>
   </div>
   <div class="syspill" id="syspill"><span class="dot"></span><span id="systext">LOADING…</span></div>
   <div class="avatar">DP</div>
-</header>
+</div></header>
 
 <main>
   <section class="panel" id="projects">
-    <div class="sechead"><h2>Projects</h2><a class="link" href="#projects">View all →</a></div>
+    <div class="sechead"><h2>Projects</h2></div>
     <div class="hscroll" id="pcards"></div>
   </section>
 
   <section class="panel">
     <div class="actions">
       <button class="action" id="rescan"><span class="ic">⟳</span><span class="lb">Rescan</span></button>
-      <button class="action" onclick="goto('#brief')"><span class="ic">☼</span><span class="lb">Daily Brief</span></button>
+      <button class="action" onclick="openBrief()"><span class="ic">☼</span><span class="lb">Daily Brief</span></button>
+      <button class="action" onclick="openNewMission()"><span class="ic">＋</span><span class="lb">New Mission</span></button>
       <button class="action" onclick="goto('#kanban')"><span class="ic">▦</span><span class="lb">Missions</span></button>
-      <button class="action" onclick="goto('#projects')"><span class="ic">⎇</span><span class="lb">Git Status</span></button>
       <button class="action" onclick="goto('#activity')"><span class="ic">≡</span><span class="lb">Activity</span></button>
     </div>
   </section>
 
   <section class="panel" id="kanban">
-    <div class="sechead"><h2>Mission Board</h2><a class="link" href="#kanban">View board →</a></div>
+    <div class="sechead"><h2>Mission Board</h2>
+      <button class="newbtn" onclick="openNewMission()">＋ New Mission</button>
+    </div>
     <div class="kanban" id="kcols"></div>
   </section>
 
@@ -227,12 +307,12 @@
     <section class="panel" id="system">
       <div class="sechead"><h2>Systems</h2></div>
       <div id="sysrows"></div>
-      <button class="logsbtn" onclick="toast('Log streaming lands in v0.2')"><span>System Logs</span><span>›</span></button>
+      <button class="logsbtn" onclick="toast('Log streaming lands in v0.3')"><span>System Logs</span><span>›</span></button>
     </section>
 
     <section class="panel" id="activity">
-      <div class="sechead"><h2>Recent Activity</h2><a class="link" href="#activity">View all →</a></div>
-      <div class="feed" id="feed"></div>
+      <div class="sechead"><h2>Recent Activity</h2></div>
+      <div id="feed"></div>
     </section>
   </div>
 
@@ -243,18 +323,61 @@
         <div class="bt">DAILY BRIEF</div>
         <div class="bs" id="briefline">—</div>
       </div>
-      <button class="go" onclick="goto('#activity')">View Brief →</button>
+      <button class="go" onclick="openBrief()">View Brief →</button>
     </div>
   </section>
 </main>
 
-<nav class="bottom">
+<nav class="bottom"><div class="navin">
   <a href="#projects" class="on"><span class="nic">⌂</span>Home</a>
   <a href="#kanban"><span class="nic">▦</span>Missions</a>
   <a href="#projects"><span class="nic">▤</span>Projects</a>
   <a href="#system"><span class="nic">◉</span>Systems</a>
   <a href="#activity"><span class="nic">≡</span>Activity</a>
-</nav>
+</div></nav>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="dhead">PAK<em>OS</em></div>
+  <a href="#projects" onclick="closeDrawer()"><span class="dic">⌂</span>Home</a>
+  <a href="#kanban" onclick="closeDrawer()"><span class="dic">▦</span>Mission Board</a>
+  <a href="#system" onclick="closeDrawer()"><span class="dic">◉</span>Systems</a>
+  <a href="#activity" onclick="closeDrawer()"><span class="dic">≡</span>Activity</a>
+  <button class="ditem" onclick="closeDrawer(); openBrief()"><span class="dic">☼</span>Daily Brief</button>
+  <button class="ditem" onclick="closeDrawer(); doRescan()"><span class="dic">⟳</span>Rescan</button>
+  <a href="https://github.com/Pak209/Pakos" target="_blank" rel="noopener"><span class="dic">⎇</span>GitHub Repo</a>
+  <div class="dfoot" id="verline">PakOS</div>
+</aside>
+
+<div class="modal" id="newModal">
+  <div class="mbox">
+    <div class="mhead"><h3>New Mission</h3><button class="mclose" onclick="closeModals()">✕</button></div>
+    <div class="field"><label for="nmTitle">Mission</label>
+      <input id="nmTitle" type="text" maxlength="140" placeholder="What needs doing?" autocomplete="off"></div>
+    <div class="field"><label for="nmProject">Project</label><select id="nmProject"></select></div>
+    <div class="field"><label for="nmStatus">Column</label><select id="nmStatus"></select></div>
+    <div class="mrow">
+      <button class="btn" onclick="closeModals()">Cancel</button>
+      <button class="btn primary" id="nmCreate">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="moveModal">
+  <div class="mbox">
+    <div class="mhead"><h3>Mission</h3><button class="mclose" onclick="closeModals()">✕</button></div>
+    <div id="mvTitle" style="font-size:14.5px"></div>
+    <div class="msrc" id="mvSrc"></div>
+    <div id="mvBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="briefModal">
+  <div class="mbox">
+    <div class="mhead"><h3>Daily Brief</h3><button class="mclose" onclick="closeModals()">✕</button></div>
+    <div class="brieflist" id="briefBody"></div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -271,16 +394,17 @@ const COLS = [
   ['review', 'REVIEW', 'var(--purple)'],
   ['done', 'DONE', 'var(--teal)'],
 ];
+const COL_LABEL = Object.fromEntries(COLS.map(([k, l]) => [k, l]));
+let STATE = null;
 
 function initials(name) {
   const parts = String(name).replace(/[-_.]/g, ' ').split(/\s+|(?=[A-Z][a-z])/).filter(Boolean);
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
 }
-
 function goto(sel) { document.querySelector(sel)?.scrollIntoView({ behavior: 'smooth' }); }
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  setTimeout(() => t.classList.remove('show'), 2600);
 }
 function ago(iso) {
   if (!iso) return '—';
@@ -291,18 +415,141 @@ function ago(iso) {
   return Math.round(s / 86400) + 'd ago';
 }
 
+/* ---------- drawer ---------- */
+function openDrawer() { $('#drawer').classList.add('show'); $('#scrim').classList.add('show'); }
+function closeDrawer() { $('#drawer').classList.remove('show'); $('#scrim').classList.remove('show'); }
+$('#burger').addEventListener('click', openDrawer);
+$('#scrim').addEventListener('click', () => { closeDrawer(); closeModals(); });
+
+/* ---------- modals ---------- */
+function closeModals() { document.querySelectorAll('.modal').forEach((m) => m.classList.remove('show')); }
+document.querySelectorAll('.modal').forEach((m) =>
+  m.addEventListener('click', (e) => { if (e.target === m) closeModals(); }));
+
+function openNewMission(status) {
+  if (!STATE) return;
+  $('#nmProject').innerHTML = STATE.projects.map((p) =>
+    `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+  $('#nmStatus').innerHTML = COLS.map(([k, l]) =>
+    `<option value="${k}"${k === (status || 'backlog') ? ' selected' : ''}>${l}</option>`).join('');
+  $('#nmTitle').value = '';
+  $('#newModal').classList.add('show');
+  setTimeout(() => $('#nmTitle').focus(), 60);
+}
+
+$('#nmCreate').addEventListener('click', async () => {
+  const title = $('#nmTitle').value.trim();
+  if (!title) { toast('Give the mission a title'); return; }
+  await api('/api/missions', {
+    project: $('#nmProject').value, title, status: $('#nmStatus').value,
+  }, 'Mission created ✓');
+});
+
+function openMove(taskId) {
+  const t = STATE?.tasks.find((x) => x.id === taskId);
+  if (!t) return;
+  $('#mvTitle').textContent = t.title;
+  $('#mvSrc').textContent = `${t.project} · ${t.source_file}:${t.line}`;
+  const movable = t.source_file.startsWith('.pakos/');
+  $('#mvBody').innerHTML = movable
+    ? `<div class="movegrid">${COLS.filter(([k]) => k !== t.status).map(([k, l, c]) =>
+        `<button class="btn" onclick="doMove(${t.id}, '${k}')">
+           <span class="cdot" style="background:${c}"></span>Move to ${l}</button>`).join('')}</div>`
+    : `<div class="mnote">Read-only: this mission lives in ${esc(t.source_file)}.
+       PakOS only writes to .pakos/board.md — edit the source file directly,
+       or recreate it as a board mission.</div>
+       <div class="mrow"><button class="btn primary" onclick="closeModals(); openNewMission('${t.status}')">Copy to board…</button></div>`;
+  $('#moveModal').classList.add('show');
+}
+
+async function doMove(taskId, toStatus) {
+  const t = STATE?.tasks.find((x) => x.id === taskId);
+  if (!t) return;
+  await api('/api/missions/move', {
+    project: t.project, sourceFile: t.source_file, line: t.line,
+    title: t.title, toStatus,
+  }, `Moved to ${COL_LABEL[toStatus]} ✓`);
+}
+
+/* ---------- auth for writes ----------
+   Writes need the bearer token from ~/.pakos/config.json (server-generated).
+   Asked for once, kept in localStorage; re-asked automatically on 401. */
+function authToken(forceAsk) {
+  let t = localStorage.getItem('pakos_token') || '';
+  if (!t || forceAsk) {
+    t = (prompt('PakOS auth token (cat ~/.pakos/config.json on the server):') || '').trim();
+    if (t) localStorage.setItem('pakos_token', t);
+  }
+  return t;
+}
+
+async function apiPost(path, body) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = authToken(attempt > 0);
+    if (!token) throw new Error('no token');
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (res.status === 401) continue; // wrong token — ask again once
+    return res;
+  }
+  throw new Error('unauthorized');
+}
+
+async function api(path, body, okMsg) {
+  try {
+    const res = await apiPost(path, body);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { toast(data.error || `Failed (${res.status})`); return; }
+    closeModals();
+    await load();
+    toast(okMsg);
+  } catch (err) {
+    toast(err.message === 'unauthorized' ? 'Bad token' :
+      err.message === 'no token' ? 'Token required for writes' :
+      'Request failed — is the server up?');
+  }
+}
+
+/* ---------- daily brief ---------- */
+function openBrief() {
+  if (!STATE) return;
+  const dayAgo = Date.now() - 86400e3;
+  const recent = STATE.commits.filter((c) => new Date(c.at) > dayAgo);
+  const byProj = {};
+  for (const c of recent) (byProj[c.project] ??= []).push(c);
+  const inProgress = STATE.tasks.filter((t) => t.status === 'in_progress');
+  const review = STATE.tasks.filter((t) => t.status === 'review');
+  const dirty = STATE.projects.filter((p) => (p.dirty || 0) + (p.untracked || 0) > 0);
+
+  const parts = [];
+  parts.push(`<div class="bl"><b>Last 24 hours</b><div>${recent.length} commits across ${Object.keys(byProj).length} projects</div>
+    ${Object.entries(byProj).map(([p, cs]) =>
+      `<div>· <b style="color:var(--text)">${esc(p)}</b>: ${cs.slice(0, 3).map((c) => esc(c.subject)).join(' · ')}${cs.length > 3 ? ` (+${cs.length - 3})` : ''}</div>`).join('')}</div>`);
+  parts.push(`<div class="bl"><b>In flight</b>
+    ${inProgress.length ? inProgress.map((t) => `<div>· ${esc(t.title)} <span style="color:var(--faint)">(${esc(t.project)})</span></div>`).join('') : '<div>nothing marked In Progress</div>'}
+    ${review.length ? `<div style="margin-top:4px">Review: ${review.map((t) => esc(t.title)).join(' · ')}</div>` : ''}</div>`);
+  parts.push(`<div class="bl"><b>Needs attention</b>
+    ${dirty.length ? dirty.map((p) => `<div>· ${esc(p.name)}: ${(p.dirty || 0) + (p.untracked || 0)} uncommitted files</div>`).join('') : '<div>all repos clean</div>'}</div>`);
+  $('#briefBody').innerHTML = parts.join('');
+  $('#briefModal').classList.add('show');
+}
+
+/* ---------- render ---------- */
 function render(state) {
+  STATE = state;
   const { projects, tasks, commits, meta, system } = state;
   const byProject = {};
   for (const t of tasks) (byProject[t.project] ??= []).push(t);
 
-  // header pill
   const anyError = projects.some((p) => p.error) || system.lastScanError;
   const pill = $('#syspill');
   pill.classList.toggle('warn', !!anyError);
   $('#systext').innerHTML = anyError ? 'CHECK<br>SYSTEM LOG' : 'ALL SYSTEMS<br>OPERATIONAL';
+  $('#verline').textContent = `PakOS v${state.version} · ${state.projectsRoot}`;
 
-  // project cards
   $('#pcards').innerHTML = projects.map((p) => {
     const pt = byProject[p.name] || [];
     const done = pt.filter((t) => t.status === 'done').length;
@@ -328,23 +575,22 @@ function render(state) {
     </div>`;
   }).join('') || '<div class="empty">No projects found.</div>';
 
-  // mission board
   $('#kcols').innerHTML = COLS.map(([key, label, color]) => {
     const items = tasks.filter((t) => t.status === key);
-    const shown = items.slice(0, 4);
     return `<div class="kcol">
       <div class="top" style="background:${color}"></div>
-      <div class="khead"><h3 style="color:${color}">${label}</h3><span class="kcount">${items.length}</span></div>
+      <div class="khead"><h3 style="color:${color}">${label}</h3>
+        <span class="kcount">${items.length}</span>
+        <button class="kadd" onclick="openNewMission('${key}')" aria-label="Add to ${label}">＋</button></div>
       <div class="kcards">
-        ${shown.map((t) => `<div class="kcard"><div class="t">${esc(t.title)}</div>
-          <div class="p"><span class="dot"></span>${esc(t.project)}</div></div>`).join('')
+        ${items.map((t) => `<button class="kcard" onclick="openMove(${t.id})"><div class="t">${esc(t.title)}</div>
+          <div class="p"><span class="dot"></span>${esc(t.project)}
+          ${t.source_file.startsWith('.pakos/') ? '' : '<span class="lock">🔒 ' + esc(t.source_file) + '</span>'}</div></button>`).join('')
           || '<div class="kmore">no missions</div>'}
-        ${items.length > shown.length ? `<div class="kmore">+ ${items.length - shown.length} more</div>` : ''}
       </div>
     </div>`;
   }).join('');
 
-  // systems
   const rows = [
     ['⎇', 'Git Services', anyError ? 'Errors' : 'Connected', !anyError],
     ['◫', 'Database', system.db ? 'Healthy' : 'Missing', system.db],
@@ -356,7 +602,6 @@ function render(state) {
     `<div class="sysrow"><span class="ic">${ic}</span><span class="nm">${nm}</span>
      <span class="val ${ok ? '' : 'bad'}">${esc(val)} ${ok ? '◉' : '◎'}</span></div>`).join('');
 
-  // activity feed
   $('#feed').innerHTML = commits.slice(0, 8).map((c) =>
     `<div class="feeditem">
       <div class="fic">⎇</div>
@@ -365,7 +610,6 @@ function render(state) {
       <div class="when">${ago(c.at)}</div>
     </div>`).join('') || '<div class="empty">No commits found yet.</div>';
 
-  // daily brief
   const dayAgo = Date.now() - 86400e3;
   const commits24 = commits.filter((c) => new Date(c.at) > dayAgo).length;
   const doneTotal = tasks.filter((t) => t.status === 'done').length;
@@ -378,52 +622,27 @@ async function load() {
   try {
     const res = await fetch('/api/state');
     render(await res.json());
-  } catch (err) {
+  } catch {
     $('#systext').textContent = 'OFFLINE';
     $('#syspill').classList.add('warn');
   }
 }
 
-// ── Auth for write actions ────────────────────────────────────────────────
-// Writes need the bearer token from ~/.pakos/config.json (server-generated).
-// Asked for once, kept in localStorage; re-asked automatically on 401.
-function authToken(forceAsk) {
-  let t = localStorage.getItem('pakos_token') || '';
-  if (!t || forceAsk) {
-    t = (prompt('PakOS auth token (cat ~/.pakos/config.json on the server):') || '').trim();
-    if (t) localStorage.setItem('pakos_token', t);
-  }
-  return t;
-}
-
-async function apiPost(path, body) {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const token = authToken(attempt > 0);
-    if (!token) throw new Error('no token');
-    const res = await fetch(path, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    if (res.status === 401) continue; // wrong token — ask again once
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.json();
-  }
-  throw new Error('unauthorized');
-}
-
-$('#rescan').addEventListener('click', async () => {
+async function doRescan() {
   const btn = $('#rescan');
   btn.classList.add('busy');
   try {
-    await apiPost('/api/scan');
+    const res = await apiPost('/api/scan');
+    if (!res.ok) throw new Error(String(res.status));
     await load();
     toast('Rescanned ✓');
-  } catch (err) { toast(err.message === 'unauthorized' ? 'Bad token' : 'Rescan failed'); }
+  } catch { toast('Rescan failed'); }
   btn.classList.remove('busy');
-});
+}
+$('#rescan').addEventListener('click', doRescan);
+$('#nmTitle')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#nmCreate').click(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModals(); closeDrawer(); } });
 
-// bottom-nav active state
 document.querySelectorAll('nav.bottom a').forEach((a) => a.addEventListener('click', () => {
   document.querySelectorAll('nav.bottom a').forEach((x) => x.classList.remove('on'));
   a.classList.add('on');
