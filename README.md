@@ -77,6 +77,7 @@ docs/                architecture · design language · security · roadmap · o
 
 ## Documentation
 
+- [Engineering Intelligence](docs/INTELLIGENCE.md) — the vision: portfolio model, mission intelligence, memory, AutoPilot
 - [Architecture](docs/ARCHITECTURE.md) — how the pieces fit, design rules
 - [Design language](docs/DESIGN.md) — the "personal JARVIS" visual system
 - [Security model](docs/SECURITY.md) — read this before widening the bind address
