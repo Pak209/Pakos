@@ -44,6 +44,14 @@ npm dependencies. Everything runs locally; nothing leaves the machine.
   via argv arrays (no shell), per-mode sandboxing, run log ring buffer,
   handoff read/append — the only writes outside PakOS's own repo, and
   they only ever touch `.pakos/` files.
+- **`lib/recommend.js`** — Mission Intelligence slice 1: recommendation
+  records (DB-cached, regenerable) from deterministic post-scan detectors
+  and validated LLM reconciliation output; accept/reject/snooze lifecycle.
+  Proposes only — the auth'd human accept in server.js is the sole path
+  from suggestion to board change.
+- **`lib/memory.js`** — engineering memory slice 1: `.pakos/rejected.md`
+  per project (append-only, human-editable); rejected suggestions stay
+  suppressed, digit-insensitively.
 - **`lib/usage.js`** — subscription usage from local session/transcript
   files; provider usage APIs only when the user adds admin keys.
 - **`lib/scanner.js`** — walks `$PAKOS_ROOT` one level deep. For each git

@@ -49,6 +49,16 @@ cloned could contain hostile markdown/filenames), and supply chain.
    `public/`; anything else is a 404. Unknown non-GET methods return 405.
 7. **Zero npm dependencies.** The supply chain is Node itself.
 
+## Recommendations (v0.2.x)
+
+Recommendation records are proposals only. Accepting one is an auth'd,
+audited write that flows through the same `lib/board.js` guards as any
+manual move; rejecting appends to that project's `.pakos/rejected.md`
+(the only new write, `.pakos/`-confined). Reconciliation runs are fixed
+read-only analyze templates; their JSON output is validated against the
+actual board (title/status/source checks) before a record is created, so
+a hallucinating agent cannot invent moves for missions that don't exist.
+
 ## Known gaps (tracked in the roadmap)
 
 - GET routes have no auth of their own — the perimeter (loopback / tailnet
