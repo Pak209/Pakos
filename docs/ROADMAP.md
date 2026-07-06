@@ -57,15 +57,27 @@ near-zero) dependencies, everything regenerable from git + markdown.
   as the app.
 - "New mission" and "request handoff" quick actions (writes to `.pakos/`).
 
-## v0.6 — Local automation
+## v0.6 — AutoPilot (scheduled crew)
+
+Full design: [docs/AUTOPILOT.md](AUTOPILOT.md) — approved 2026-07, ships
+as its own PR series (AP-1 … AP-4) only after v0.2 crew dispatch has
+soaked. In one paragraph: Day Watch (a few calendar wake-ups) and Night
+Shift (hourly ticks inside a window) inspect the Mission Board and run
+**pre-approved missions only** — triple consent (global config +
+per-project `.pakos/crew.json` + per-mission `@auto`/`@night` tag),
+analyze-only by default with a fourth consent for writes, hard budgets
+(missions/run, minutes/mission, minutes/day+night), failure breakers,
+post-flight git checks (never commit/push/deploy/secrets), kill switch,
+a brief per wake-up, and the same board lifecycle as manual dispatch —
+Review → Done stays human, always. No continuous loop by construction.
+
+## v0.7–v0.9 — Local automation, polish & hardening
 
 - Script runner for a whitelist the user defines per project
   (`.pakos/commands.md`): build, test, package — opt-in, auth-gated,
   output captured to the activity feed.
 - launchd health: PakOS watches its sibling agents (AlphaLab-style) and
   surfaces their status.
-
-## v0.7–v0.9 — Polish & hardening
 
 - Progress trends (scan history retained, sparklines per project).
 - Notifications (ntfy/webhook) for briefs and failures.
