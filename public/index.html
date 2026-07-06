@@ -384,14 +384,42 @@ async function load() {
   }
 }
 
+// ── Auth for write actions ────────────────────────────────────────────────
+// Writes need the bearer token from ~/.pakos/config.json (server-generated).
+// Asked for once, kept in localStorage; re-asked automatically on 401.
+function authToken(forceAsk) {
+  let t = localStorage.getItem('pakos_token') || '';
+  if (!t || forceAsk) {
+    t = (prompt('PakOS auth token (cat ~/.pakos/config.json on the server):') || '').trim();
+    if (t) localStorage.setItem('pakos_token', t);
+  }
+  return t;
+}
+
+async function apiPost(path, body) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = authToken(attempt > 0);
+    if (!token) throw new Error('no token');
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (res.status === 401) continue; // wrong token — ask again once
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+  throw new Error('unauthorized');
+}
+
 $('#rescan').addEventListener('click', async () => {
   const btn = $('#rescan');
   btn.classList.add('busy');
   try {
-    await fetch('/api/scan', { method: 'POST' });
+    await apiPost('/api/scan');
     await load();
     toast('Rescanned ✓');
-  } catch { toast('Rescan failed'); }
+  } catch (err) { toast(err.message === 'unauthorized' ? 'Bad token' : 'Rescan failed'); }
   btn.classList.remove('busy');
 });
 

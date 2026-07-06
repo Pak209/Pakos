@@ -10,7 +10,7 @@ itself. Adversaries considered: anything on your network (if you widen
 the bind address), malicious content inside scanned repos (a repo you
 cloned could contain hostile markdown/filenames), and supply chain.
 
-## Guarantees (v0.1)
+## Guarantees (v0.2)
 
 1. **Read-only against repositories.** The full set of executed git
    commands: `branch`, `status --porcelain`, `rev-list`, `remote get-url`,
@@ -18,27 +18,39 @@ cloned could contain hostile markdown/filenames), and supply chain.
    arguments and an 8s timeout. There is no code path that writes to a
    scanned repo — no fetch, pull, commit, push, or checkout.
 2. **Loopback by default.** Binds `127.0.0.1` unless `PAKOS_HOST` is set.
-   Remote access is expected to go over Tailscale (WireGuard, tailnet-only).
-   **There is no auth layer yet — never bind `0.0.0.0`.**
-3. **No secrets touched.** `.env` files are never read. Remote URLs are
+   Remote access goes over Tailscale (WireGuard, tailnet-only) or a
+   Cloudflare Tunnel fronted by Cloudflare Access (docs/REMOTE.md) — both
+   connect to loopback locally. **Never bind `0.0.0.0`**: GET routes carry
+   no auth of their own; keeping them unreachable except via loopback,
+   tailnet, or the Access-gated tunnel is the perimeter.
+3. **Writes require a bearer token.** Every non-GET route demands
+   `Authorization: Bearer <authToken>` (constant-time compare) from
+   `~/.pakos/config.json` — a 0600 file generated on first run, never
+   hardcoded, never served, never echoed by any endpoint. Each
+   authenticated write is appended to `data/audit.log` together with the
+   `Cf-Access-Authenticated-User-Email` header when the edge provides one.
+4. **No secrets touched.** `.env` files are never read. Remote URLs are
    stripped of embedded credentials (`https://user:token@…`) before they
-   reach the database or a browser. Dotfiles are never served.
-4. **Bounded parsing of untrusted input.** Task files are size-capped
+   reach the database or a browser. Dotfiles are never served. The only
+   secret PakOS holds is its own config file above.
+5. **Bounded parsing of untrusted input.** Task files are size-capped
    (256 KB), parsed line-by-line with regex (no markdown engine, no HTML
    rendering of file content server-side), and all strings are
    HTML-escaped client-side before insertion into the DOM.
-5. **Traversal-guarded static serving.** Resolved paths must stay inside
-   `public/`; anything else is a 404. Non-GET methods (except
-   `POST /api/scan`) return 405.
-6. **Zero npm dependencies.** The supply chain is Node itself.
+6. **Traversal-guarded static serving.** Resolved paths must stay inside
+   `public/`; anything else is a 404. Unknown non-GET methods return 405.
+7. **Zero npm dependencies.** The supply chain is Node itself.
 
 ## Known gaps (tracked in the roadmap)
 
-- No authentication or rate limiting — acceptable only while
-  loopback/tailnet-bound. Ships before any write endpoint (v0.4).
-- `POST /api/scan` is unauthenticated; worst case is wasted CPU
-  (scan is throttled to one at a time).
-- No CSRF protection — irrelevant while read-only, mandatory with writes.
+- GET routes have no auth of their own — the perimeter (loopback / tailnet
+  / Access-gated tunnel) is what protects reads. Rate limiting: none.
+- The `Cf-Access-Jwt-Assertion` header is not cryptographically verified
+  server-side (stdlib RS256 verification is a planned hardening); identity
+  enforcement happens at the Cloudflare edge.
+- CSRF: the bearer token lives in `localStorage` and is attached
+  explicitly per request (never a cookie), so classic CSRF doesn't apply;
+  revisit if cookie-based sessions are ever added.
 - SQLite in Node 22 is flagged experimental upstream.
 
 ## Operational rules
