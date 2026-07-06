@@ -8,14 +8,16 @@ const path = require('node:path');
 const os = require('node:os');
 
 const { scan, PROJECTS_ROOT } = require('./lib/scanner');
-const { replaceScan, getState, getProject, DB_PATH } = require('./lib/db');
+const { replaceScan, getState, getProject, getHistory, DB_PATH } = require('./lib/db');
 const { getConfig, verifyBearer, CONFIG_PATH } = require('./lib/config');
 const { createMission, moveMission, BoardError } = require('./lib/board');
 const { verifyAccessJwt } = require('./lib/access');
 const { getUsage } = require('./lib/usage');
 const crew = require('./lib/crew');
 const recommend = require('./lib/recommend');
+const { computeAll, computeHealth } = require('./lib/health');
 const { appendRejected } = require('./lib/memory');
+const { buildBriefing, saveBrief } = require('./lib/briefing');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
 const PORT = Number(process.env.PAKOS_PORT || 4180);
@@ -124,6 +126,15 @@ async function authenticate(req, res) {
   return null;
 }
 
+// Last N parsed audit lines (newest last) — briefing input, never trusted
+// for auth decisions.
+function readAuditTail(n) {
+  try {
+    const lines = fs.readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').slice(-n);
+    return lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  } catch { return []; }
+}
+
 const MAX_BODY_BYTES = 16 * 1024;
 
 function readBody(req) {
@@ -172,7 +183,9 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/api/state' && req.method === 'GET') {
     const state = getState();
-    const { access } = getConfig();
+    const { access, health } = getConfig();
+    const grades = computeAll(state, PROJECTS_ROOT, health.weights);
+    state.projects = state.projects.map((p) => ({ ...p, health: grades[p.name] || null }));
     const accessOn = !!(access?.teamDomain && access?.audTag && access?.allowedEmails?.length);
     return json(res, 200, {
       version: VERSION,
@@ -208,6 +221,9 @@ const server = http.createServer((req, res) => {
     catch { return json(res, 400, { error: 'bad project name' }); }
     const detail = getProject(name);
     if (!detail) return json(res, 404, { error: 'unknown project' });
+    detail.health = computeHealth(detail.project, detail.tasks, PROJECTS_ROOT,
+      getConfig().health.weights);
+    detail.history = getHistory(name);
     return json(res, 200, detail);
   }
 
@@ -233,6 +249,39 @@ const server = http.createServer((req, res) => {
           if (code === 500) console.error('[pakos] mission write failed:', err);
           return json(res, code, { error: err.message });
         });
+    });
+    return;
+  }
+
+  // ── The Briefing (docs/INTELLIGENCE.md §8 — deterministic content only)
+  if (url.pathname === '/api/briefing' && req.method === 'GET') {
+    const state = getState();
+    const { health } = getConfig();
+    const auditLines = readAuditTail(400);
+    return json(res, 200, buildBriefing({
+      state,
+      health: computeAll(state, PROJECTS_ROOT, health.weights),
+      recommendations: recommend.listOpen(),
+      runs: crew.listRuns(),
+      auditLines,
+    }));
+  }
+
+  if (url.pathname === '/api/briefing/save' && req.method === 'POST') {
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      const state = getState();
+      const { health } = getConfig();
+      const briefing = buildBriefing({
+        state,
+        health: computeAll(state, PROJECTS_ROOT, health.weights),
+        recommendations: recommend.listOpen(),
+        runs: crew.listRuns(),
+        auditLines: readAuditTail(400),
+      });
+      const file = saveBrief(briefing, __dirname);
+      audit(id.who, 'brief_save', path.relative(__dirname, file));
+      return json(res, 200, { ok: true, file: path.relative(__dirname, file) });
     });
     return;
   }
