@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>PakOS — Command Center</title>
+<style>
+  /* Design language: docs/DESIGN.md — OLED black, glass panels, cyan/teal light, rare purple. */
+  :root {
+    --bg: #000000;
+    --glass: rgba(16, 22, 28, .62);
+    --glass-2: rgba(22, 30, 38, .55);
+    --line: rgba(94, 234, 212, .10);
+    --line-strong: rgba(94, 234, 212, .22);
+    --cyan: #22d3ee;
+    --teal: #2dd4bf;
+    --purple: #a78bfa;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --gray: #6b7280;
+    --text: #e6f1f3;
+    --muted: #7c9299;
+    --faint: #4c5e63;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, "SF Pro Text", system-ui, sans-serif;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  a { color: inherit; text-decoration: none; }
+
+  @keyframes pulse { 50% { opacity: .3; } }
+  @keyframes glowpulse { 50% { box-shadow: 0 0 2px var(--teal); opacity: .55; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+
+  header.top {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px 10px; position: sticky; top: 0; z-index: 20;
+    background: rgba(0, 0, 0, .72);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border-bottom: 1px solid var(--line);
+  }
+  .burger { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 6px 0; border-right: 1px solid var(--line); }
+  .burger span { display: block; width: 22px; height: 2px; background: var(--text); border-radius: 2px; }
+  .burger span:nth-child(2) { width: 15px; }
+  .logo { flex: 1; }
+  .logo .word { font-family: var(--mono); font-weight: 800; font-size: 20px; letter-spacing: 1px; }
+  .logo .word em { font-style: normal; color: var(--cyan); text-shadow: 0 0 14px rgba(34, 211, 238, .45); }
+  .logo .sub { font-size: 9.5px; letter-spacing: 3.5px; color: var(--muted); font-weight: 600; }
+  .syspill {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--line-strong); background: var(--glass);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-radius: 10px; padding: 7px 11px;
+    font-size: 9.5px; letter-spacing: 1.5px; font-weight: 700; color: var(--teal);
+    text-transform: uppercase; line-height: 1.25; text-align: left;
+  }
+  .syspill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal);
+    box-shadow: 0 0 10px var(--teal); animation: glowpulse 2s ease-in-out infinite; }
+  .syspill.warn { color: var(--amber); }
+  .syspill.warn .dot { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    border: 1.5px solid var(--cyan); color: var(--cyan);
+    display: grid; place-items: center; font-weight: 700; font-size: 13px; font-family: var(--mono);
+  }
+
+  main { padding: 12px 12px 0; display: grid; gap: 12px; max-width: 1100px; margin: 0 auto; }
+  section.panel {
+    background: var(--glass); border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    background-image: linear-gradient(180deg, rgba(94, 234, 212, .04), transparent 26%);
+  }
+  .sechead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .sechead h2 { font-size: 11px; letter-spacing: 2px; color: var(--cyan); font-weight: 700; text-transform: uppercase; }
+  .sechead .link { font-size: 12.5px; color: var(--muted); }
+  .sechead .link:active { color: var(--cyan); }
+
+  .hscroll { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; scrollbar-width: none; }
+  .hscroll::-webkit-scrollbar { display: none; }
+
+  .pcard {
+    min-width: 236px; max-width: 260px; flex-shrink: 0; scroll-snap-align: start;
+    background: var(--glass-2); border: 1px solid var(--line); border-radius: 14px; padding: 13px;
+  }
+  .pcard .head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .picon {
+    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: .5px;
+    color: var(--cyan); background: rgba(34, 211, 238, .07); border: 1px solid var(--line-strong);
+  }
+  .pcard .name { font-weight: 700; font-size: 15px; letter-spacing: .3px; text-transform: uppercase; }
+  .pcard .desc { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.active { color: var(--teal); }
+  .badge.active .dot { background: var(--teal); box-shadow: 0 0 8px var(--teal); animation: glowpulse 2s ease-in-out infinite; }
+  .badge.idle { color: var(--faint); } .badge.idle .dot { background: var(--faint); }
+  .gitline { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+  .bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.06); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--cyan)); border-radius: 2px; }
+  .pstats { display: flex; justify-content: space-between; margin-top: 11px; font-family: var(--mono); font-size: 13px; }
+  .pstats span { display: inline-flex; gap: 5px; align-items: center; color: var(--text); }
+  .ok { color: var(--teal); } .warn { color: var(--amber); } .dim { color: var(--muted); }
+
+  .actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .action { background: none; border: none; color: var(--text); font: inherit; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 2px; border-radius: 12px;
+    transition: background .18s ease-out; }
+  .action:active { background: rgba(34, 211, 238, .07); }
+  .action .ic {
+    width: 46px; height: 46px; border: 1.5px solid var(--line-strong); border-radius: 13px;
+    display: grid; place-items: center; font-size: 19px; color: var(--cyan);
+    background: rgba(34, 211, 238, .04);
+  }
+  .action .lb { font-size: 11.5px; color: var(--text); }
+  .action.busy .ic { animation: pulse 1s infinite; }
+
+  .kanban { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 4px; scrollbar-width: none; }
+  .kanban::-webkit-scrollbar { display: none; }
+  .kcol { min-width: 200px; max-width: 220px; flex-shrink: 0; scroll-snap-align: start;
+    background: var(--glass-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .kcol .top { height: 2px; opacity: .85; }
+  .kcol .khead { display: flex; align-items: center; justify-content: space-between; padding: 10px 11px 8px; }
+  .kcol .khead h3 { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; }
+  .kcount { font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 9px; background: rgba(255,255,255,.07); }
+  .kcards { padding: 0 8px 8px; display: grid; gap: 7px; }
+  .kcard { background: rgba(0, 0, 0, .35); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; }
+  .kcard .t { font-size: 12.5px; line-height: 1.35; }
+  .kcard .p { margin-top: 7px; display: inline-flex; align-items: center; gap: 5px;
+    font-size: 9.5px; letter-spacing: 1px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+  .kcard .p .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); }
+  .kmore { font-size: 11.5px; color: var(--faint); padding: 2px 2px 4px; }
+
+  .grid2 { display: grid; gap: 12px; }
+  @media (min-width: 760px) { .grid2 { grid-template-columns: 5fr 7fr; } }
+
+  .sysrow { display: flex; align-items: center; gap: 11px; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .sysrow:last-of-type { border-bottom: none; }
+  .sysrow .ic { width: 20px; text-align: center; color: var(--muted); font-family: var(--mono); }
+  .sysrow .nm { flex: 1; }
+  .sysrow .val { color: var(--teal); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
+  .sysrow .val.bad { color: var(--amber); }
+  .logsbtn { margin-top: 10px; width: 100%; text-align: left; background: rgba(0,0,0,.3); color: var(--text);
+    border: 1px solid var(--line); border-radius: 11px; padding: 11px 13px; font: inherit; font-size: 13.5px;
+    display: flex; justify-content: space-between; cursor: pointer; }
+
+  .feed { position: relative; }
+  .feeditem { display: flex; gap: 11px; padding: 8px 0; }
+  .feeditem .fic { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 14px; color: var(--cyan);
+    background: rgba(34, 211, 238, .06); border: 1px solid var(--line); }
+  .feeditem .fbody { flex: 1; min-width: 0; }
+  .feeditem .ft { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feeditem .fs { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .feeditem .when { font-size: 11.5px; color: var(--faint); white-space: nowrap; padding-top: 2px; }
+
+  .brief { display: flex; align-items: center; gap: 12px; }
+  .brief .sun { font-size: 22px; color: var(--cyan); }
+  .brief .bt { font-size: 12px; letter-spacing: 1.5px; color: var(--cyan); font-weight: 700; }
+  .brief .bs { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .brief .go { margin-left: auto; border: 1px solid var(--line-strong); color: var(--cyan); background: rgba(34,211,238,.05);
+    font: inherit; font-size: 13px; border-radius: 10px; padding: 9px 14px; cursor: pointer; white-space: nowrap; }
+
+  nav.bottom {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: flex; justify-content: space-around;
+    background: rgba(0, 0, 0, .78);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid var(--line);
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  }
+  nav.bottom a { display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 10.5px; color: var(--muted); padding: 4px 10px; border-radius: 10px;
+    transition: color .18s ease-out; }
+  nav.bottom a.on { color: var(--cyan); background: rgba(34, 211, 238, .07); }
+  nav.bottom .nic { font-size: 17px; }
+
+  .empty { color: var(--faint); font-size: 13px; padding: 6px 2px; }
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--line-strong); color: var(--text);
+    border-radius: 12px; padding: 10px 16px; font-size: 13px; z-index: 40; opacity: 0; transition: opacity .2s ease-out; pointer-events: none; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="burger"><span></span><span></span><span></span></div>
+  <div class="logo">
+    <div class="word">PAK<em>OS</em></div>
+    <div class="sub">COMMAND CENTER</div>
+  </div>
+  <div class="syspill" id="syspill"><span class="dot"></span><span id="systext">LOADING…</span></div>
+  <div class="avatar">DP</div>
+</header>
+
+<main>
+  <section class="panel" id="projects">
+    <div class="sechead"><h2>Projects</h2><a class="link" href="#projects">View all →</a></div>
+    <div class="hscroll" id="pcards"></div>
+  </section>
+
+  <section class="panel">
+    <div class="actions">
+      <button class="action" id="rescan"><span class="ic">⟳</span><span class="lb">Rescan</span></button>
+      <button class="action" onclick="goto('#brief')"><span class="ic">☼</span><span class="lb">Daily Brief</span></button>
+      <button class="action" onclick="goto('#kanban')"><span class="ic">▦</span><span class="lb">Missions</span></button>
+      <button class="action" onclick="goto('#projects')"><span class="ic">⎇</span><span class="lb">Git Status</span></button>
+      <button class="action" onclick="goto('#activity')"><span class="ic">≡</span><span class="lb">Activity</span></button>
+    </div>
+  </section>
+
+  <section class="panel" id="kanban">
+    <div class="sechead"><h2>Mission Board</h2><a class="link" href="#kanban">View board →</a></div>
+    <div class="kanban" id="kcols"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel" id="system">
+      <div class="sechead"><h2>Systems</h2></div>
+      <div id="sysrows"></div>
+      <button class="logsbtn" onclick="toast('Log streaming lands in v0.2')"><span>System Logs</span><span>›</span></button>
+    </section>
+
+    <section class="panel" id="activity">
+      <div class="sechead"><h2>Recent Activity</h2><a class="link" href="#activity">View all →</a></div>
+      <div class="feed" id="feed"></div>
+    </section>
+  </div>
+
+  <section class="panel" id="brief">
+    <div class="brief">
+      <span class="sun">☼</span>
+      <div>
+        <div class="bt">DAILY BRIEF</div>
+        <div class="bs" id="briefline">—</div>
+      </div>
+      <button class="go" onclick="goto('#activity')">View Brief →</button>
+    </div>
+  </section>
+</main>
+
+<nav class="bottom">
+  <a href="#projects" class="on"><span class="nic">⌂</span>Home</a>
+  <a href="#kanban"><span class="nic">▦</span>Missions</a>
+  <a href="#projects"><span class="nic">▤</span>Projects</a>
+  <a href="#system"><span class="nic">◉</span>Systems</a>
+  <a href="#activity"><span class="nic">≡</span>Activity</a>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const COLS = [
+  ['backlog', 'BACKLOG', 'var(--gray)'],
+  ['ready', 'READY', 'var(--cyan)'],
+  ['in_progress', 'IN PROGRESS', 'var(--amber)'],
+  ['review', 'REVIEW', 'var(--purple)'],
+  ['done', 'DONE', 'var(--teal)'],
+];
+
+function initials(name) {
+  const parts = String(name).replace(/[-_.]/g, ' ').split(/\s+|(?=[A-Z][a-z])/).filter(Boolean);
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
+}
+
+function goto(sel) { document.querySelector(sel)?.scrollIntoView({ behavior: 'smooth' }); }
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function ago(iso) {
+  if (!iso) return '—';
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 90) return 'just now';
+  if (s < 3600) return Math.round(s / 60) + 'm ago';
+  if (s < 86400) return Math.round(s / 3600) + 'h ago';
+  return Math.round(s / 86400) + 'd ago';
+}
+
+function render(state) {
+  const { projects, tasks, commits, meta, system } = state;
+  const byProject = {};
+  for (const t of tasks) (byProject[t.project] ??= []).push(t);
+
+  // header pill
+  const anyError = projects.some((p) => p.error) || system.lastScanError;
+  const pill = $('#syspill');
+  pill.classList.toggle('warn', !!anyError);
+  $('#systext').innerHTML = anyError ? 'CHECK<br>SYSTEM LOG' : 'ALL SYSTEMS<br>OPERATIONAL';
+
+  // project cards
+  $('#pcards').innerHTML = projects.map((p) => {
+    const pt = byProject[p.name] || [];
+    const done = pt.filter((t) => t.status === 'done').length;
+    const pct = pt.length ? Math.round((done / pt.length) * 100) : (p.is_git ? 100 : 0);
+    const fresh = p.last_commit_at && (Date.now() - new Date(p.last_commit_at)) < 14 * 86400e3;
+    const attention = (p.dirty || 0) + (p.untracked || 0);
+    return `<div class="pcard">
+      <div class="head">
+        <div class="picon">${esc(initials(p.name))}</div>
+        <div style="flex:1;min-width:0">
+          <div class="name">${esc(p.name)}</div>
+          <div class="desc">${p.is_git ? esc((p.remote_url || '').replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git$/, '') || 'local repo') : 'not a git repo'}</div>
+        </div>
+      </div>
+      <span class="badge ${fresh ? 'active' : 'idle'}"><span class="dot"></span>${fresh ? 'Active' : 'Idle'}</span>
+      <div class="gitline"><span>${esc(p.branch || '—')}</span><span>${esc(p.last_commit_hash || '')}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="pstats">
+        <span class="ok">✓ ${pt.length ? done : '—'}</span>
+        <span class="dim">⎇ ${p.branch_count ?? '—'}</span>
+        <span class="${attention ? 'warn' : 'dim'}">△ ${attention}</span>
+      </div>
+    </div>`;
+  }).join('') || '<div class="empty">No projects found.</div>';
+
+  // mission board
+  $('#kcols').innerHTML = COLS.map(([key, label, color]) => {
+    const items = tasks.filter((t) => t.status === key);
+    const shown = items.slice(0, 4);
+    return `<div class="kcol">
+      <div class="top" style="background:${color}"></div>
+      <div class="khead"><h3 style="color:${color}">${label}</h3><span class="kcount">${items.length}</span></div>
+      <div class="kcards">
+        ${shown.map((t) => `<div class="kcard"><div class="t">${esc(t.title)}</div>
+          <div class="p"><span class="dot"></span>${esc(t.project)}</div></div>`).join('')
+          || '<div class="kmore">no missions</div>'}
+        ${items.length > shown.length ? `<div class="kmore">+ ${items.length - shown.length} more</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // systems
+  const rows = [
+    ['⎇', 'Git Services', anyError ? 'Errors' : 'Connected', !anyError],
+    ['◫', 'Database', system.db ? 'Healthy' : 'Missing', system.db],
+    ['◷', 'Scanner', meta.last_scan_at ? `Ran ${ago(meta.last_scan_at)}` : 'Never', !!meta.last_scan_at],
+    ['⇄', 'Tailscale', system.tailscale ? 'Connected' : 'Not detected', !!system.tailscale],
+    ['▣', 'Server', `Up ${Math.round(system.uptimeSec / 60)}m · ${system.node}`, true],
+  ];
+  $('#sysrows').innerHTML = rows.map(([ic, nm, val, ok]) =>
+    `<div class="sysrow"><span class="ic">${ic}</span><span class="nm">${nm}</span>
+     <span class="val ${ok ? '' : 'bad'}">${esc(val)} ${ok ? '◉' : '◎'}</span></div>`).join('');
+
+  // activity feed
+  $('#feed').innerHTML = commits.slice(0, 8).map((c) =>
+    `<div class="feeditem">
+      <div class="fic">⎇</div>
+      <div class="fbody"><div class="ft"><b>${esc(c.project)}</b>: ${esc(c.subject)}</div>
+      <div class="fs">${esc(c.hash)} · ${esc(c.author || '')}</div></div>
+      <div class="when">${ago(c.at)}</div>
+    </div>`).join('') || '<div class="empty">No commits found yet.</div>';
+
+  // daily brief
+  const dayAgo = Date.now() - 86400e3;
+  const commits24 = commits.filter((c) => new Date(c.at) > dayAgo).length;
+  const doneTotal = tasks.filter((t) => t.status === 'done').length;
+  const dirtyRepos = projects.filter((p) => (p.dirty || 0) + (p.untracked || 0) > 0).length;
+  $('#briefline').textContent =
+    `${doneTotal} missions done · ${commits24} commits in 24h · ${dirtyRepos} repos with uncommitted work`;
+}
+
+async function load() {
+  try {
+    const res = await fetch('/api/state');
+    render(await res.json());
+  } catch (err) {
+    $('#systext').textContent = 'OFFLINE';
+    $('#syspill').classList.add('warn');
+  }
+}
+
+$('#rescan').addEventListener('click', async () => {
+  const btn = $('#rescan');
+  btn.classList.add('busy');
+  try {
+    await fetch('/api/scan', { method: 'POST' });
+    await load();
+    toast('Rescanned ✓');
+  } catch { toast('Rescan failed'); }
+  btn.classList.remove('busy');
+});
+
+// bottom-nav active state
+document.querySelectorAll('nav.bottom a').forEach((a) => a.addEventListener('click', () => {
+  document.querySelectorAll('nav.bottom a').forEach((x) => x.classList.remove('on'));
+  a.classList.add('on');
+}));
+
+load();
+setInterval(load, 60_000);
+</script>
+</body>
+</html>

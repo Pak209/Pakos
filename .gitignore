@@ -1,0 +1,15 @@
+# generated at runtime
+data/
+logs/
+
+# machine-specific runbook (contains tailnet details) — keep local
+CHECKPOINT.md
+
+# environment / secrets
+.env
+.env.*
+
+# misc
+node_modules/
+.DS_Store
+*.log

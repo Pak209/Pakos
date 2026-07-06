@@ -1,0 +1,12 @@
+{
+  "name": "pakos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PakOS — local, read-only project command center for the Mac mini",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "scan": "node -e \"const{scan}=require('./lib/scanner');const{replaceScan}=require('./lib/db');replaceScan(scan());console.log('scan ok')\""
+  },
+  "engines": { "node": ">=22" }
+}
