@@ -35,6 +35,14 @@ test('email match is case-insensitive', async () => {
   assert.equal(email, 'dankimoto8@gmail.com');
 });
 
+test('allowedEmails is a list — any entry matches, others still reject', async () => {
+  const multi = { ...ACCESS, allowedEmails: ['first@example.com', 'dankimoto8@gmail.com', 'third@example.com'] };
+  assert.equal((await verifyAccessJwt(sign({}), multi)).email, 'dankimoto8@gmail.com');
+  assert.equal((await verifyAccessJwt(sign({ email: 'third@example.com' }), multi)).email, 'third@example.com');
+  await assert.rejects(() => verifyAccessJwt(sign({ email: 'fourth@example.com' }), multi),
+    /not on the allowlist/);
+});
+
 test('rejects everything it must reject', async () => {
   const now = Math.floor(Date.now() / 1000);
   const cases = [

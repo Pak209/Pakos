@@ -95,11 +95,16 @@ sessions and no OAuth secrets.
 
 ```json
 "access": {
-  "teamDomain": "<team>.cloudflareaccess.com",
-  "audTag": "<the 64-hex AUD tag>",
-  "allowedEmails": ["you@example.com"]
+  "teamDomain": "pak209.cloudflareaccess.com",
+  "audTag": "<the 64-hex AUD tag from step 3>",
+  "allowedEmails": ["dankimoto8@gmail.com", "second-account@example.com"]
 }
 ```
+
+`allowedEmails` is a list — add as many accounts as you like; matching is
+case-insensitive. An email must pass BOTH gates to write: the Cloudflare
+Access policy at the edge and this server-side allowlist, so adding one
+here without also adding it to the Access policy does nothing.
 
 ### Behavior and guarantees
 
