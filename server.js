@@ -12,6 +12,7 @@ const { replaceScan, getState, getProject, DB_PATH } = require('./lib/db');
 const { getConfig, verifyBearer, CONFIG_PATH } = require('./lib/config');
 const { createMission, moveMission, BoardError } = require('./lib/board');
 const { verifyAccessJwt } = require('./lib/access');
+const { getUsage } = require('./lib/usage');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
 const PORT = Number(process.env.PAKOS_PORT || 4180);
@@ -181,6 +182,14 @@ const server = http.createServer((req, res) => {
       },
       ...state,
     });
+  }
+
+  if (url.pathname === '/api/usage' && req.method === 'GET') {
+    // Local file parsing only — see lib/usage.js. Cached ~60s.
+    getUsage(getConfig())
+      .then((usage) => json(res, 200, usage))
+      .catch((err) => json(res, 500, { error: String(err.message || err) }));
+    return;
   }
 
   // Per-project detail: full commit history, branch list, missions.
