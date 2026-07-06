@@ -306,6 +306,15 @@
     max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
   .kcard .owner { color: var(--purple); font-weight: 700; }
 
+  /* briefing */
+  .bsec { margin-bottom: 10px; }
+  .bsec:last-child { margin-bottom: 0; }
+  .bsec h3 { font-size: 10px; letter-spacing: 1.6px; color: var(--teal); text-transform: uppercase; margin-bottom: 4px; }
+  .bsec .bl { font-size: 12.5px; color: var(--text); padding: 2px 0; line-height: 1.4; }
+  .bsec .bl .bp { color: var(--cyan); font-weight: 600; }
+  .bsec .bl .bd { color: var(--muted); }
+  .bsec .empty { padding: 2px 0; }
+
   /* health */
   .gradechip { font-family: var(--mono); font-weight: 800; font-size: 15px; width: 26px; height: 26px;
     border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
@@ -362,6 +371,12 @@
 </div></header>
 
 <main>
+  <section class="panel" id="briefing">
+    <div class="sechead"><h2>The Briefing</h2>
+      <button class="link" id="briefsave" style="cursor:pointer">save to .pakos/briefs ↓</button></div>
+    <div id="briefbody"><div class="empty">Loading…</div></div>
+  </section>
+
   <section class="panel" id="projects">
     <div class="sechead"><h2>Projects</h2></div>
     <div class="hscroll" id="pcards"></div>
@@ -370,7 +385,7 @@
   <section class="panel">
     <div class="actions">
       <button class="action" id="rescan"><span class="ic">⟳</span><span class="lb">Rescan</span></button>
-      <button class="action" onclick="openBrief()"><span class="ic">☼</span><span class="lb">Daily Brief</span></button>
+      <button class="action" onclick="goto('#briefing')"><span class="ic">☼</span><span class="lb">Daily Brief</span></button>
       <button class="action" onclick="openNewMission()"><span class="ic">＋</span><span class="lb">New Mission</span></button>
       <button class="action" onclick="goto('#kanban')"><span class="ic">▦</span><span class="lb">Missions</span></button>
       <button class="action" onclick="goto('#activity')"><span class="ic">≡</span><span class="lb">Activity</span></button>
@@ -454,7 +469,7 @@
         <div class="bt">DAILY BRIEF</div>
         <div class="bs" id="briefline">—</div>
       </div>
-      <button class="go" onclick="openBrief()">View Brief →</button>
+      <button class="go" onclick="goto('#briefing')">View Brief →</button>
     </div>
   </section>
 </main>
@@ -842,6 +857,47 @@ function renderUsage(u) {
   $('#usagestamp').textContent = 'as of ' + ago(u.generatedAt);
 }
 
+// ── The Briefing ────────────────────────────────────────────────────────────
+function bline(items, fmt, emptyText) {
+  return items.length ? items.map(fmt).join('') : `<div class="empty">${emptyText}</div>`;
+}
+
+function renderBriefing(b) {
+  $('#briefbody').innerHTML = `
+    <div class="bsec"><h3>Overnight</h3>
+      ${bline(b.overnight.commits, (c) => `<div class="bl"><span class="bp">${esc(c.project)}</span> ${c.count} commit${c.count === 1 ? '' : 's'} <span class="bd">— ${esc(c.latest)}</span></div>`, 'no commits in 24h')}
+      ${b.overnight.crewRuns.map((r) => `<div class="bl"><span class="bp">crew</span> <span class="bd">${esc(r)}</span></div>`).join('')}
+      ${b.overnight.boardMoves.map((m) => `<div class="bl"><span class="bp">board</span> <span class="bd">${esc(m)}</span></div>`).join('')}
+    </div>
+    <div class="bsec"><h3>Attention</h3>
+      ${bline(b.attention, (a) => `<div class="bl"><span class="bp">${esc(a.project)}</span> <span class="bd">${esc(a.line)}</span></div>`, 'all clear')}
+    </div>
+    <div class="bsec"><h3>Today</h3>
+      ${bline(b.today, (t) => `<div class="bl"><span class="bp">${esc(t.project)}</span> ${esc(t.title)} <span class="bd">(${esc(t.action)}) — ${esc(t.why)}</span></div>`, 'no open recommendations')}
+    </div>
+    <div class="bsec"><h3>Delegate</h3>
+      ${bline(b.delegate, (d) => `<div class="bl"><span class="bp">${esc(d.project)}</span> ${esc(d.title)} <span class="owner">@${esc(d.owner)}</span></div>`, 'nothing tagged for crew')}
+    </div>
+    <div class="bsec"><h3>Drifting</h3>
+      ${bline(b.drifting, (d) => `<div class="bl"><span class="bp">${esc(d.project)}</span> <span class="bd">${esc(d.reason)}</span></div>`, 'none')}
+    </div>
+    <div class="bsec"><h3>Next</h3><div class="bl bd">${esc(b.next)}</div></div>`;
+}
+
+async function loadBriefing() {
+  try {
+    renderBriefing(await (await fetch('/api/briefing')).json());
+  } catch { $('#briefbody').innerHTML = '<div class="empty">Briefing unavailable.</div>'; }
+}
+
+$('#briefsave').addEventListener('click', async () => {
+  try {
+    const res = await apiPost('/api/briefing/save');
+    const data = await res.json().catch(() => ({}));
+    toast(res.ok ? `Saved ${data.file}` : (data.error || 'Save failed'));
+  } catch { toast('Save failed'); }
+});
+
 // ── Portfolio health matrix ─────────────────────────────────────────────────
 const DIMS = [['momentum','MOM'],['hygiene','HYG'],['recovery','RECOV'],['debt','DEBT'],['direction','DIR']];
 let openWhy = null;
@@ -1100,6 +1156,7 @@ async function load() {
   }
   refreshCrew();
   loadRecs();
+  loadBriefing();
 }
 
 async function doRescan() {

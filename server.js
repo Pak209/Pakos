@@ -17,6 +17,7 @@ const crew = require('./lib/crew');
 const recommend = require('./lib/recommend');
 const { computeAll, computeHealth } = require('./lib/health');
 const { appendRejected } = require('./lib/memory');
+const { buildBriefing, saveBrief } = require('./lib/briefing');
 
 const HOST = process.env.PAKOS_HOST || '127.0.0.1';
 const PORT = Number(process.env.PAKOS_PORT || 4180);
@@ -123,6 +124,15 @@ async function authenticate(req, res) {
 
   json(res, 401, { error: 'unauthorized', hint: `token lives in ${CONFIG_PATH}` });
   return null;
+}
+
+// Last N parsed audit lines (newest last) — briefing input, never trusted
+// for auth decisions.
+function readAuditTail(n) {
+  try {
+    const lines = fs.readFileSync(AUDIT_PATH, 'utf8').trimEnd().split('\n').slice(-n);
+    return lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  } catch { return []; }
 }
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -239,6 +249,39 @@ const server = http.createServer((req, res) => {
           if (code === 500) console.error('[pakos] mission write failed:', err);
           return json(res, code, { error: err.message });
         });
+    });
+    return;
+  }
+
+  // ── The Briefing (docs/INTELLIGENCE.md §8 — deterministic content only)
+  if (url.pathname === '/api/briefing' && req.method === 'GET') {
+    const state = getState();
+    const { health } = getConfig();
+    const auditLines = readAuditTail(400);
+    return json(res, 200, buildBriefing({
+      state,
+      health: computeAll(state, PROJECTS_ROOT, health.weights),
+      recommendations: recommend.listOpen(),
+      runs: crew.listRuns(),
+      auditLines,
+    }));
+  }
+
+  if (url.pathname === '/api/briefing/save' && req.method === 'POST') {
+    authenticate(req, res).then((id) => {
+      if (!id) return;
+      const state = getState();
+      const { health } = getConfig();
+      const briefing = buildBriefing({
+        state,
+        health: computeAll(state, PROJECTS_ROOT, health.weights),
+        recommendations: recommend.listOpen(),
+        runs: crew.listRuns(),
+        auditLines: readAuditTail(400),
+      });
+      const file = saveBrief(briefing, __dirname);
+      audit(id.who, 'brief_save', path.relative(__dirname, file));
+      return json(res, 200, { ok: true, file: path.relative(__dirname, file) });
     });
     return;
   }
