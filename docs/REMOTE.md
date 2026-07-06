@@ -28,11 +28,27 @@ PakOS itself keeps binding `127.0.0.1`. Nothing in this setup changes
 
 Prereqs: the `pak-labs.com` zone on this Cloudflare account (it is), Homebrew.
 
+### Step 1 — Access policy FIRST (mandatory, Cloudflare dashboard)
+
+**Do not create the tunnel before this exists.** The Access application can
+be defined before any DNS record, and doing it first means the hostname is
+identity-gated from the very first second it resolves. A tunnel without
+this policy is a public URL straight to your dashboard.
+
+1. [one.dash.cloudflare.com](https://one.dash.cloudflare.com) → Access → Applications → **Add an application** → Self-hosted.
+2. Application domain: `pakos.pak-labs.com` (all paths). Session duration: 1 week.
+3. Policy: name `owner-only`, action **Allow**, include → Emails →
+   `dankimoto8@gmail.com`. No other includes. Save.
+4. (Optional) Login methods: keep One-time PIN, or add Google so it's one tap.
+
+### Step 2 — Tunnel
+
 ```sh
 scripts/setup_tunnel.sh pakos.pak-labs.com
 ```
 
-The script is idempotent and stops to tell you what it needs. It performs:
+The script is idempotent, confirms you did Step 1 before routing DNS, and
+performs:
 
 1. `brew install cloudflared` (if missing)
 2. `cloudflared tunnel login` — one browser approval, pick the pak-labs.com zone
@@ -41,26 +57,52 @@ The script is idempotent and stops to tell you what it needs. It performs:
 5. writes `~/.cloudflared/config.yml` → ingress `pakos.pak-labs.com → http://127.0.0.1:4180`
 6. `sudo cloudflared service install` — starts now and at boot
 
-## Access policy (one-time, Cloudflare dashboard)
+### Step 3 — Verify
 
-Until this step is done the hostname is reachable by anyone — do it
-immediately after the script:
-
-1. [one.dash.cloudflare.com](https://one.dash.cloudflare.com) → Access → Applications → **Add an application** → Self-hosted.
-2. Application domain: `pakos.pak-labs.com` (all paths). Session duration: 1 week.
-3. Policy: name `owner-only`, action **Allow**, include → Emails →
-   `dankimoto8@gmail.com`. No other includes. Save.
-4. (Optional) Login methods: keep One-time PIN, or add Google so it's one tap.
-
-Verify: open https://pakos.pak-labs.com from a phone **off** your WiFi — you
-must hit the Access login; a different email must be rejected; after login the
-dashboard loads and Rescan asks for the PakOS token once.
+- Open https://pakos.pak-labs.com from a phone **off** your WiFi — you must
+  hit the Access login before anything else renders.
+- A different email must be rejected at the edge.
+- After login the dashboard loads and Rescan asks for the PakOS token once.
+- `curl -sI https://pakos.pak-labs.com` from anywhere should return a
+  Cloudflare Access redirect (302 to the login page), never PakOS content.
 
 ## Operations
 
 - Status: `sudo launchctl list | grep cloudflared` · `cloudflared tunnel info pakos`
 - Logs: `/Library/Logs/com.cloudflare.cloudflared.err.log`
-- Uninstall: `sudo cloudflared service uninstall`; delete the Access app in
-  the dashboard; `cloudflared tunnel delete pakos`.
 - Tailscale continues to work in parallel (`docs/OPERATIONS.md`), and
   localhost on the machine itself is always available.
+
+## Rollback
+
+**Kill remote exposure now (seconds, reversible):**
+
+```sh
+sudo launchctl bootout system/com.cloudflare.cloudflared
+```
+
+The hostname stops resolving to anything live; PakOS itself is untouched
+(still on 127.0.0.1 and Tailscale). Bring it back with
+`sudo launchctl bootstrap system /Library/LaunchDaemons/com.cloudflare.cloudflared.plist`.
+
+**Remove the tunnel entirely:**
+
+```sh
+sudo cloudflared service uninstall
+cloudflared tunnel delete pakos          # also removes its credentials file
+```
+
+Then delete the `pakos` CNAME record (Cloudflare dashboard → DNS) and,
+optionally, the Access application. `~/.cloudflared/` can be deleted too.
+
+**Revert the v0.2 auth change itself:**
+
+```sh
+git revert <merge-commit> && launchctl kickstart -k gui/$UID/com.pakos.dashboard
+```
+
+Nothing else to clean: the token lives only in `~/.pakos/config.json`
+(delete it if you like — it is regenerated on next v0.2 start), the audit
+trail is `data/audit.log` (plain text, disposable), and the browser copy of
+the token sits in localStorage where a stale value is simply ignored by
+v0.1. No schema or data migrations are involved.

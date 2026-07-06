@@ -32,6 +32,13 @@ fi
 TUNNEL_ID="$(cloudflared tunnel list | awk -v n="$TUNNEL_NAME" '$2==n {print $1}')"
 [[ -n "$TUNNEL_ID" ]] || fail "could not resolve tunnel id for '$TUNNEL_NAME'"
 
+# Gate: routing DNS is the moment the hostname goes live. Access must
+# already be gating it (docs/REMOTE.md §Step 1) or this is a public URL.
+printf '\033[33m[setup]\033[0m Is the Cloudflare Access application for %s already created\n' "$HOSTNAME_FQDN"
+printf '        (Allow only your email — docs/REMOTE.md Step 1)? [y/N] '
+read -r REPLY
+[[ "$REPLY" =~ ^[Yy]$ ]] || fail "create the Access policy first, then re-run this script"
+
 say "routing DNS $HOSTNAME_FQDN → tunnel $TUNNEL_NAME"
 cloudflared tunnel route dns "$TUNNEL_NAME" "$HOSTNAME_FQDN" || true  # exists already ⇒ fine
 
@@ -58,5 +65,5 @@ else
   sudo launchctl kickstart -k system/com.cloudflare.cloudflared
 fi
 
-say "done. NOW LOCK IT DOWN: add the Cloudflare Access policy (docs/REMOTE.md §Access policy)."
-say "until that policy exists, https://$HOSTNAME_FQDN is publicly reachable."
+say "done. Verify from a device off your network: https://$HOSTNAME_FQDN must show"
+say "the Cloudflare Access login before anything else (docs/REMOTE.md §Step 3)."
