@@ -371,12 +371,6 @@
 </div></header>
 
 <main>
-  <section class="panel" id="briefing">
-    <div class="sechead"><h2>The Briefing</h2>
-      <button class="link" id="briefsave" style="cursor:pointer">save to .pakos/briefs ↓</button></div>
-    <div id="briefbody"><div class="empty">Loading…</div></div>
-  </section>
-
   <section class="panel" id="projects">
     <div class="sechead"><h2>Projects</h2></div>
     <div class="hscroll" id="pcards"></div>
@@ -385,7 +379,7 @@
   <section class="panel">
     <div class="actions">
       <button class="action" id="rescan"><span class="ic">⟳</span><span class="lb">Rescan</span></button>
-      <button class="action" onclick="goto('#briefing')"><span class="ic">☼</span><span class="lb">Daily Brief</span></button>
+      <button class="action" onclick="openBrief()"><span class="ic">☼</span><span class="lb">Daily Brief</span></button>
       <button class="action" onclick="openNewMission()"><span class="ic">＋</span><span class="lb">New Mission</span></button>
       <button class="action" onclick="goto('#kanban')"><span class="ic">▦</span><span class="lb">Missions</span></button>
       <button class="action" onclick="goto('#activity')"><span class="ic">≡</span><span class="lb">Activity</span></button>
@@ -469,7 +463,7 @@
         <div class="bt">DAILY BRIEF</div>
         <div class="bs" id="briefline">—</div>
       </div>
-      <button class="go" onclick="goto('#briefing')">View Brief →</button>
+      <button class="go" onclick="openBrief()">View Brief →</button>
     </div>
   </section>
 </main>
@@ -522,8 +516,12 @@
 
 <div class="modal" id="briefModal">
   <div class="mbox">
-    <div class="mhead"><h3>Daily Brief</h3><button class="mclose" onclick="closeModals()">✕</button></div>
-    <div class="brieflist" id="briefBody"></div>
+    <div class="mhead"><h3>Daily Brief</h3>
+      <div style="display:flex;gap:12px;align-items:center">
+        <button class="link" id="briefsave" style="cursor:pointer">save ↓</button>
+        <button class="mclose" onclick="closeModals()">✕</button>
+      </div></div>
+    <div id="briefBody"></div>
   </div>
 </div>
 
@@ -664,28 +662,11 @@ async function api(path, body, okMsg) {
   }
 }
 
-/* ---------- daily brief ---------- */
+/* ---------- daily brief (modal, server-computed content) ---------- */
 function openBrief() {
-  if (!STATE) return;
-  const dayAgo = Date.now() - 86400e3;
-  const recent = STATE.commits.filter((c) => new Date(c.at) > dayAgo);
-  const byProj = {};
-  for (const c of recent) (byProj[c.project] ??= []).push(c);
-  const inProgress = STATE.tasks.filter((t) => t.status === 'in_progress');
-  const review = STATE.tasks.filter((t) => t.status === 'review');
-  const dirty = STATE.projects.filter((p) => (p.dirty || 0) + (p.untracked || 0) > 0);
-
-  const parts = [];
-  parts.push(`<div class="bl"><b>Last 24 hours</b><div>${recent.length} commits across ${Object.keys(byProj).length} projects</div>
-    ${Object.entries(byProj).map(([p, cs]) =>
-      `<div>· <b style="color:var(--text)">${esc(p)}</b>: ${cs.slice(0, 3).map((c) => esc(c.subject)).join(' · ')}${cs.length > 3 ? ` (+${cs.length - 3})` : ''}</div>`).join('')}</div>`);
-  parts.push(`<div class="bl"><b>In flight</b>
-    ${inProgress.length ? inProgress.map((t) => `<div>· ${esc(t.title)} <span style="color:var(--faint)">(${esc(t.project)})</span></div>`).join('') : '<div>nothing marked In Progress</div>'}
-    ${review.length ? `<div style="margin-top:4px">Review: ${review.map((t) => esc(t.title)).join(' · ')}</div>` : ''}</div>`);
-  parts.push(`<div class="bl"><b>Needs attention</b>
-    ${dirty.length ? dirty.map((p) => `<div>· ${esc(p.name)}: ${(p.dirty || 0) + (p.untracked || 0)} uncommitted files</div>`).join('') : '<div>all repos clean</div>'}</div>`);
-  $('#briefBody').innerHTML = parts.join('');
+  $('#briefBody').innerHTML = '<div class="empty">Loading…</div>';
   $('#briefModal').classList.add('show');
+  loadBriefing();
 }
 
 /* ---------- render ---------- */
@@ -863,7 +844,7 @@ function bline(items, fmt, emptyText) {
 }
 
 function renderBriefing(b) {
-  $('#briefbody').innerHTML = `
+  $('#briefBody').innerHTML = `
     <div class="bsec"><h3>Overnight</h3>
       ${bline(b.overnight.commits, (c) => `<div class="bl"><span class="bp">${esc(c.project)}</span> ${c.count} commit${c.count === 1 ? '' : 's'} <span class="bd">— ${esc(c.latest)}</span></div>`, 'no commits in 24h')}
       ${b.overnight.crewRuns.map((r) => `<div class="bl"><span class="bp">crew</span> <span class="bd">${esc(r)}</span></div>`).join('')}
@@ -887,7 +868,7 @@ function renderBriefing(b) {
 async function loadBriefing() {
   try {
     renderBriefing(await (await fetch('/api/briefing')).json());
-  } catch { $('#briefbody').innerHTML = '<div class="empty">Briefing unavailable.</div>'; }
+  } catch { $('#briefBody').innerHTML = '<div class="empty">Briefing unavailable.</div>'; }
 }
 
 $('#briefsave').addEventListener('click', async () => {
@@ -1156,7 +1137,6 @@ async function load() {
   }
   refreshCrew();
   loadRecs();
-  loadBriefing();
 }
 
 async function doRescan() {
