@@ -3,38 +3,52 @@
 Each release keeps the invariants: read-only until auth exists, zero (or
 near-zero) dependencies, everything regenerable from git + markdown.
 
-## v0.2 — Missions & depth (read-only)
+> **Reorder note (v0.2, 2026-07):** remote multi-device access and a
+> Codex-first crew became the immediate need, so v0.2 pulled auth forward
+> from v0.4 and a scoped dispatch slice forward from v0.5. The original
+> v0.2 read-only items (detail view, Daily Brief) moved to v0.3 —
+> deferred, not cancelled. Invariants unchanged.
 
-- Per-project detail view: commit history, branch list, mission sources.
-- Mission model formalized: `.pakos/board.md` spec v1 (status, tags,
-  optional `@agent` owner), parser upgraded but backward-compatible.
-- Daily Brief generator: scheduled markdown digest (commits, mission
-  deltas, dirty repos) written to `.pakos/briefs/` in PakOS's own repo,
-  rendered in the UI.
+## v0.2 — Auth, remote access, usage, crew dispatch *(shipped as this release)*
+
+- Auth (from v0.4): bearer token in `~/.pakos/config.json` (0600,
+  generated), required by all non-GET routes; audit log of every write.
+- Remote: Cloudflare Tunnel + Cloudflare Access at pakos.pak-labs.com
+  (docs/REMOTE.md); server stays loopback-bound.
+- Usage panel: Codex subscription limits (exact, from local session
+  files), Claude estimate (local transcript parsing — no secrets, no
+  OAuth), provider API usage cards that appear only when admin keys are
+  added to config.
+- Crew dispatch (scoped slice of v0.5): `@owner` tag in the board spec;
+  human-triggered two-step (preview → confirm) dispatch of Codex/Claude
+  onto a mission; handoff file convention `.pakos/handoff-<topic>.md`;
+  run log polling + cancel. No scheduling, no auto-pickup.
+
+## v0.3 — Missions & depth + GitHub awareness (read-only)
+
+- Per-project detail view: commit history, branch list, mission sources
+  *(moved from v0.2)*.
+- Daily Brief generator: markdown digest written to `.pakos/briefs/`,
+  rendered in the UI *(moved from v0.2; still human-triggered)*.
 - UI: reduced-motion support, pull-to-refresh, better empty states.
-
-## v0.3 — GitHub awareness (read-only)
-
 - Opt-in `git fetch` per project (still never mutates working trees) for
   true ahead/behind.
 - GitHub API (via `gh` or token): open PRs, issues, CI status per project.
 - Activity feed merges local commits + remote events.
 
-## v0.4 — Identity & the first write
+## v0.4 — Mission write-back
 
-- Auth: bearer token (and/or Tailscale identity headers). All non-GET
-  routes require it; CSRF protection added.
-- **First write endpoint**: move a mission between columns — implemented
-  as a guarded edit to that project's `.pakos/board.md` only. Code and
-  other files remain untouchable.
-- Audit log of every write.
+- **Board write endpoint**: move a mission between columns — a guarded
+  edit to that project's `.pakos/board.md` only. Code and other files
+  remain untouchable. (Auth + audit shipped early in v0.2.)
+- Stdlib RS256 verification of `Cf-Access-Jwt-Assertion` (edge identity
+  checked server-side too).
 
-## v0.5 — Crew (agent handoffs)
+## v0.5 — Crew (full)
 
-- Handoff convention: `.pakos/handoff-<topic>.md` — structured context an
-  agent (Lex, Fable, Codex, …) or human leaves for the next crew member.
-- Crew panel: which agent touched which mission last, handoffs awaiting
-  pickup. Agents stay peripheral: they appear on missions, not as the app.
+- Crew panel matures: which agent touched which mission last, handoffs
+  awaiting pickup. Agents stay peripheral: they appear on missions, not
+  as the app.
 - "New mission" and "request handoff" quick actions (writes to `.pakos/`).
 
 ## v0.6 — Local automation

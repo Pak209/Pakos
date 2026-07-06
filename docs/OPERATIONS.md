@@ -32,14 +32,27 @@ environment and future node upgrades are handled.
 - `logs/pakos.out.log` — scans, requests of note, startup banner
 - `logs/pakos.err.log` — failures (should stay empty)
 
-## Remote access (Tailscale)
+## Remote access
+
+**Cloudflare Tunnel (any device, browser login)** — the primary path:
+`scripts/setup_tunnel.sh pakos.pak-labs.com`, then add the Access policy.
+Full runbook: [docs/REMOTE.md](REMOTE.md). PakOS keeps binding loopback.
+
+**Tailscale (tailnet devices)** — still works in parallel:
 
 1. Add to the plist's `EnvironmentVariables`:
    `<key>PAKOS_HOST</key><string>YOUR_TAILSCALE_IP</string>`
 2. `launchctl kickstart -k gui/$UID/com.pakos.dashboard`
 3. Open `http://<machine-tailnet-name>:4180` from any tailnet device.
 
-Never bind `0.0.0.0` — v0.1 has no auth (see docs/SECURITY.md).
+Never bind `0.0.0.0` — GET routes rely on the perimeter (see docs/SECURITY.md).
+
+## Auth token
+
+Non-GET routes require the bearer token from `~/.pakos/config.json`
+(created on first run, mode 0600). View it with `cat ~/.pakos/config.json`;
+the dashboard asks for it once and keeps it in the browser's localStorage.
+Rotate by editing the file and restarting the service.
 
 ## Environment variables
 
@@ -50,6 +63,7 @@ Never bind `0.0.0.0` — v0.1 has no auth (see docs/SECURITY.md).
 | `PAKOS_PORT` | `4180` | HTTP port |
 | `PAKOS_SCAN_INTERVAL` | `300` | auto-rescan seconds |
 | `PAKOS_DB` | `data/pakos.sqlite3` | SQLite path |
+| `PAKOS_CONFIG_DIR` | `~/.pakos` | config dir (config.json) |
 
 ## Recovery
 
