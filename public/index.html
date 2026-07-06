@@ -306,6 +306,24 @@
     max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
   .kcard .owner { color: var(--purple); font-weight: 700; }
 
+  /* health */
+  .gradechip { font-family: var(--mono); font-weight: 800; font-size: 15px; width: 26px; height: 26px;
+    border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
+  .gA, .gB { color: var(--teal); background: rgba(45,212,191,.10); }
+  .gC, .gD { color: var(--amber); background: rgba(251,191,36,.10); }
+  .gF { color: var(--red); background: rgba(248,113,113,.10); }
+  .matrix { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .matrix th { font-size: 9.5px; letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase;
+    text-align: right; padding: 4px 8px; font-weight: 700; }
+  .matrix th:first-child { text-align: left; }
+  .matrix td { padding: 6px 8px; text-align: right; font-family: var(--mono); border-top: 1px solid var(--line); }
+  .matrix td:first-child { text-align: left; font-family: inherit; }
+  .matrix .mrow-name { cursor: pointer; }
+  .hs { display: inline-block; min-width: 26px; }
+  .hs.lo { color: var(--red); } .hs.mid { color: var(--amber); } .hs.hi { color: var(--teal); }
+  .whybox { font-family: inherit; font-size: 11.5px; color: var(--muted); text-align: left; padding: 4px 8px 10px; }
+  .whybox b { color: var(--cyan); font-weight: 600; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+
   /* recommendations */
   .recrow { border: 1px solid var(--line); border-radius: 12px; margin-top: 8px; background: var(--glass-2); padding: 11px 12px; }
   .recrow .rhead { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
@@ -364,6 +382,11 @@
       <button class="newbtn" onclick="openNewMission()">＋ New Mission</button>
     </div>
     <div class="kanban" id="kcols"></div>
+  </section>
+
+  <section class="panel" id="portfolio">
+    <div class="sechead"><h2>Portfolio Health</h2><span class="link">tap a row for reasons</span></div>
+    <div style="overflow-x:auto"><table class="matrix" id="matrix"></table></div>
   </section>
 
   <section class="panel" id="recs">
@@ -679,6 +702,7 @@ function render(state) {
     const pct = pt.length ? Math.round((done / pt.length) * 100) : (p.is_git ? 100 : 0);
     const fresh = p.last_commit_at && (Date.now() - new Date(p.last_commit_at)) < 14 * 86400e3;
     const attention = (p.dirty || 0) + (p.untracked || 0);
+    const h = p.health;
     return `<div class="pcard">
       <div class="head">
         <div class="picon">${esc(initials(p.name))}</div>
@@ -686,10 +710,11 @@ function render(state) {
           <div class="name">${esc(p.name)}</div>
           <div class="desc">${p.is_git ? esc((p.remote_url || '').replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git$/, '') || 'local repo') : 'not a git repo'}</div>
         </div>
+        ${h ? `<span class="gradechip g${h.grade}">${h.grade}</span>` : ''}
       </div>
       <span class="badge ${fresh ? 'active' : 'idle'}"><span class="dot"></span>${fresh ? 'Active' : 'Idle'}</span>
       <div class="gitline"><span>${esc(p.branch || '—')}</span><span>${esc(p.last_commit_hash || '')}</span></div>
-      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="bar"><i class="${h && h.score < 55 ? (h.score < 40 ? 'crit' : 'warn') : ''}" style="width:${h ? h.score : pct}%"></i></div>
       <div class="pstats">
         <span class="ok">✓ ${pt.length ? done : '—'}</span>
         <span class="dim">⎇ ${p.branch_count ?? '—'}</span>
@@ -815,6 +840,34 @@ function renderUsage(u) {
 
   $('#ucards').innerHTML = cards.join('');
   $('#usagestamp').textContent = 'as of ' + ago(u.generatedAt);
+}
+
+// ── Portfolio health matrix ─────────────────────────────────────────────────
+const DIMS = [['momentum','MOM'],['hygiene','HYG'],['recovery','RECOV'],['debt','DEBT'],['direction','DIR']];
+let openWhy = null;
+
+function hs(n) { return `<span class="hs ${n < 40 ? 'lo' : n < 70 ? 'mid' : 'hi'}">${n}</span>`; }
+
+function renderPortfolio(projects) {
+  const rows = projects.filter((p) => p.health);
+  $('#matrix').innerHTML = `<tr><th>Project</th><th>Grade</th>${DIMS.map(([, l]) => `<th>${l}</th>`).join('')}</tr>` +
+    rows.map((p) => {
+      const h = p.health;
+      const why = openWhy === p.name
+        ? `<tr><td colspan="${DIMS.length + 2}" class="whybox">${DIMS.map(([k]) =>
+            `<div><b>${k}</b> ${h.dims[k].reasons.map(esc).join(' · ')}</div>`).join('')}</td></tr>`
+        : '';
+      return `<tr class="mrow-name" onclick="toggleWhy('${esc(p.name)}')">
+        <td>${esc(p.name)}</td>
+        <td><span class="gradechip g${h.grade}" style="width:22px;height:22px;font-size:12px">${h.grade}</span></td>
+        ${DIMS.map(([k]) => `<td>${hs(h.dims[k].score)}</td>`).join('')}
+      </tr>${why}`;
+    }).join('') || '<tr><td class="empty">No git projects scanned yet.</td></tr>';
+}
+
+function toggleWhy(name) {
+  openWhy = openWhy === name ? null : name;
+  if (STATE) renderPortfolio(STATE.projects);
 }
 
 // ── Recommendations ────────────────────────────────────────────────────────
@@ -1032,6 +1085,7 @@ async function load() {
     const state = await res.json();
     crewProjects = state.projects.map((p) => p.name);
     render(state);
+    renderPortfolio(state.projects);
     syncCrewForm();
     fillSelect($('#reconproject'), crewProjects, true);
   } catch (err) {
