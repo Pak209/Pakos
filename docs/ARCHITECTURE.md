@@ -58,6 +58,9 @@ npm dependencies. Everything runs locally; nothing leaves the machine.
   grade, weights tunable in config. Every score ships with its reasons.
   Quality (CI) deferred to the GitHub sensors. `scan_history` (90-day,
   pruned) is the trend substrate.
+- **`lib/briefing.js`** — The Briefing v1: the seven morning questions
+  answered deterministically from scan/health/recommendation/run/audit
+  data; optional save to PakOS's own `.pakos/briefs/` (constant path).
 - **`lib/usage.js`** — subscription usage from local session/transcript
   files; provider usage APIs only when the user adds admin keys.
 - **`lib/scanner.js`** — walks `$PAKOS_ROOT` one level deep. For each git
